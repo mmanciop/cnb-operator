@@ -1,0 +1,11 @@
+{
+  "name": "com.canonical.nodejs.test.httpserver",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "author": "Michele Mancioppi",
+  "license": "ISC"
+}

@@ -1,0 +1,60 @@
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["ca-certificates-helper"]
+    version = "2.2.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/ca-certificates"
+    version = "2.2.0"
+
+[[bom]]
+  name = "node"
+  [bom.metadata]
+    licenses = []
+    name = "Node Engine"
+    sha256 = "2ebd327ccedbe0b4ac45639679abba835145d916a58f48fd4b17db21ed29e75e"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://buildpacks.cloudfoundry.org/dependencies/node/node_14.17.0_linux_x64_cflinuxfs3_2ebd327c.tgz"
+    version = "14.17.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/node-engine"
+    version = "0.4.0"
+
+[[bom]]
+  name = "node_modules"
+  [bom.metadata]
+    launch = true
+  [bom.buildpack]
+    id = "paketo-buildpacks/npm-install"
+    version = "0.3.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/ca-certificates"
+  id = "paketo-buildpacks/ca-certificates"
+  version = "2.2.0"
+
+[[buildpacks]]
+  api = "0.4"
+  homepage = "https://github.com/paketo-buildpacks/node-engine"
+  id = "paketo-buildpacks/node-engine"
+  version = "0.4.0"
+
+[[buildpacks]]
+  api = "0.4"
+  homepage = "https://github.com/paketo-buildpacks/npm-install"
+  id = "paketo-buildpacks/npm-install"
+  version = "0.3.0"
+
+[[buildpacks]]
+  api = "0.4"
+  homepage = "https://github.com/paketo-buildpacks/npm-start"
+  id = "paketo-buildpacks/npm-start"
+  version = "0.2.0"
+
+[[processes]]
+  type = "web"
+  command = "node src/index.js"
+  direct = false
+  buildpack-id = "paketo-buildpacks/npm-start"

@@ -20,6 +20,10 @@ def mock_pull_java_executable_jar_metadata(self, path):
     return ConfigFile("tests/fixtures/metadata/java_jar.toml")
 
 
+def mock_pull_nodejs_http_server_metadata(self, path):
+    return ConfigFile("tests/fixtures/metadata/nodejs_http_server.toml")
+
+
 def mock_pull_file_not_found(self, path):
     raise APIError("no", "nope", "NOPE", "No such file or directory")
 
@@ -125,6 +129,32 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
 
         # Check the service was started
         self.assertEqual(self.harness.charm._stored.application_type, "JVM")
+        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
+
+        service = self.harness.model.unit.get_container("application").get_service("application")
+        self.assertTrue(service.is_running())
+
+        # Get the plan now we've run PebbleReady
+        updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
+        # Check we've got the plan we expected
+        self.assertTrue("environment" not in
+                        updated_plan["services"]["application"])
+
+    @patch.object(Container, "pull", new=mock_pull_nodejs_http_server_metadata)
+    def test_application_pebble_ready_nodejs_http_server(self):
+        self.assertIsNone(self.harness.charm._stored.application_type)
+
+        # Check the initial Pebble plan is empty
+        initial_plan = self.harness.get_container_pebble_plan("application")
+        self.assertEqual(initial_plan.to_yaml(), "{}\n")
+        # Expected plan after Pebble ready with default config
+
+        container = self.harness.model.unit.get_container("application")
+        # Emit the PebbleReadyEvent carrying the httpbin container
+        self.harness.charm.on.application_pebble_ready.emit(container)
+
+        # Check the service was started
+        self.assertEqual(self.harness.charm._stored.application_type, "UNKNOWN")
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
 
         service = self.harness.model.unit.get_container("application").get_service("application")
