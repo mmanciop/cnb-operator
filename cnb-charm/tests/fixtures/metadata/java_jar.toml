@@ -1,0 +1,116 @@
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["ca-certificates-helper"]
+    version = "2.2.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/ca-certificates"
+    version = "2.2.0"
+
+[[bom]]
+  name = "jre"
+  [bom.metadata]
+    layer = "jre"
+    name = "BellSoft Liberica JRE"
+    sha256 = "5bbb7b867ab797ace54aa98a76b7abcca6c5fa01338ee2907e97adb21150c414"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://github.com/bell-sw/Liberica/releases/download/11.0.11+9/bellsoft-jre11.0.11+9-linux-amd64.tar.gz"
+    version = "11.0.11"
+
+    [[bom.metadata.licenses]]
+      type = "GPL-2.0 WITH Classpath-exception-2.0"
+      uri = "https://openjdk.java.net/legal/gplv2+ce.html"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["active-processor-count", "java-opts", "link-local-dns", "memory-calculator", "openssl-certificate-loader", "security-providers-configurer", "security-providers-classpath-9"]
+    version = "8.0.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[bom]]
+  name = "jvmkill"
+  [bom.metadata]
+    layer = "jvmkill"
+    name = "JVMKill Agent"
+    sha256 = "a3092627b082cb3cdbbe4b255d35687126aa604e6b613dcda33be9f7e1277162"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://github.com/cloudfoundry/jvmkill/releases/download/v1.16.0.RELEASE/jvmkill-1.16.0-RELEASE.so"
+    version = "1.16.0"
+
+    [[bom.metadata.licenses]]
+      type = "Apache-2.0"
+      uri = "https://github.com/cloudfoundry/jvmkill/blob/main/LICENSE"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/ca-certificates"
+  id = "paketo-buildpacks/ca-certificates"
+  version = "2.2.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/bellsoft-liberica"
+  id = "paketo-buildpacks/bellsoft-liberica"
+  version = "8.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/maven"
+  id = "paketo-buildpacks/maven"
+  version = "5.2.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/executable-jar"
+  id = "paketo-buildpacks/executable-jar"
+  version = "5.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/apache-tomcat"
+  id = "paketo-buildpacks/apache-tomcat"
+  version = "5.4.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/dist-zip"
+  id = "paketo-buildpacks/dist-zip"
+  version = "4.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/spring-boot"
+  id = "paketo-buildpacks/spring-boot"
+  version = "4.3.0"
+
+[[processes]]
+  type = "executable-jar"
+  command = "java"
+  args = ["com.canonical.java.test.UselessApplication"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"
+
+[[processes]]
+  type = "task"
+  command = "java"
+  args = ["com.canonical.java.test.UselessApplication"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"
+
+[[processes]]
+  type = "web"
+  command = "java"
+  args = ["com.canonical.java.test.UselessApplication"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"

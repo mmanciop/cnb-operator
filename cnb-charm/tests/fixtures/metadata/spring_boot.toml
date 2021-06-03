@@ -1,0 +1,413 @@
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["ca-certificates-helper"]
+    version = "2.2.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/ca-certificates"
+    version = "2.2.0"
+
+[[bom]]
+  name = "jre"
+  [bom.metadata]
+    layer = "jre"
+    name = "BellSoft Liberica JRE"
+    sha256 = "5bbb7b867ab797ace54aa98a76b7abcca6c5fa01338ee2907e97adb21150c414"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://github.com/bell-sw/Liberica/releases/download/11.0.11+9/bellsoft-jre11.0.11+9-linux-amd64.tar.gz"
+    version = "11.0.11"
+
+    [[bom.metadata.licenses]]
+      type = "GPL-2.0 WITH Classpath-exception-2.0"
+      uri = "https://openjdk.java.net/legal/gplv2+ce.html"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["active-processor-count", "java-opts", "link-local-dns", "memory-calculator", "openssl-certificate-loader", "security-providers-configurer", "security-providers-classpath-9"]
+    version = "8.0.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[bom]]
+  name = "jvmkill"
+  [bom.metadata]
+    layer = "jvmkill"
+    name = "JVMKill Agent"
+    sha256 = "a3092627b082cb3cdbbe4b255d35687126aa604e6b613dcda33be9f7e1277162"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://github.com/cloudfoundry/jvmkill/releases/download/v1.16.0.RELEASE/jvmkill-1.16.0-RELEASE.so"
+    version = "1.16.0"
+
+    [[bom.metadata.licenses]]
+      type = "Apache-2.0"
+      uri = "https://github.com/cloudfoundry/jvmkill/blob/main/LICENSE"
+  [bom.buildpack]
+    id = "paketo-buildpacks/bellsoft-liberica"
+    version = "8.0.0"
+
+[[bom]]
+  name = "dependencies"
+  [bom.metadata]
+    layer = "application"
+
+    [[bom.metadata.dependencies]]
+      name = "bson"
+      sha256 = "c8046ba69698c7dfd86f4987825bd93cfc70a9af7c689f8cbb0e15e57dc0b4af"
+      version = "4.2.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-annotations"
+      sha256 = "05da0a25bb44a217880a299a1a1e0a301d194b5656a9a07776b77a88f326e7e9"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-core"
+      sha256 = "baef34fbce041d54f3af3ff4fc917ed8b43ed2a6fa30e0a6abfd9a2b2c3f71e0"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-databind"
+      sha256 = "94d973062c2fda3dff2c9a85eafce57204821cce9085a99377693dbc9fb8da23"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-datatype-jdk8"
+      sha256 = "1d131cf0f20c13cffb4f8bb5c2afd68c413c4e1b76fe7384e4fecc8a8c36cb1a"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-datatype-jsr310"
+      sha256 = "a56dc7dfe15896680d64f746c1105e11f8f18b2331355739b0cdf7794adb4bc3"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jackson-module-parameter-names"
+      sha256 = "f9655527c39093ba744d02d09d6e254285d1447d3ffbd15ef8f6326907382063"
+      version = "2.12.3"
+
+    [[bom.metadata.dependencies]]
+      name = "jakarta.annotation-api"
+      sha256 = "85fb03fc054cdf4efca8efd9b6712bbb418e1ab98241c4539c8585bbc23e1b8a"
+      version = "1.3.5"
+
+    [[bom.metadata.dependencies]]
+      name = "jul-to-slf4j"
+      sha256 = "bbcbfdaa72572255c4f85207a9bfdb24358dc993e41252331bd4d0913e4988b9"
+      version = "1.7.30"
+
+    [[bom.metadata.dependencies]]
+      name = "log4j-api"
+      sha256 = "8caf58db006c609949a0068110395a33067a2bad707c3da35e959c0473f9a916"
+      version = "2.14.1"
+
+    [[bom.metadata.dependencies]]
+      name = "log4j-to-slf4j"
+      sha256 = "8ba1d1b1c8313731ee053368371b9606c1d71436ac010b0bf91b4c7fc643a1bf"
+      version = "2.14.1"
+
+    [[bom.metadata.dependencies]]
+      name = "logback-classic"
+      sha256 = "fb53f8539e7fcb8f093a56e138112056ec1dc809ebb020b59d8a36a5ebac37e0"
+      version = "1.2.3"
+
+    [[bom.metadata.dependencies]]
+      name = "logback-core"
+      sha256 = "5946d837fe6f960c02a53eda7a6926ecc3c758bbdd69aa453ee429f858217f22"
+      version = "1.2.3"
+
+    [[bom.metadata.dependencies]]
+      name = "mongodb-driver-core"
+      sha256 = "59ec81d5139a2f8aaaca89907e1d37c6e53f531b095aca9c425eb10905d9eb99"
+      version = "4.2.3"
+
+    [[bom.metadata.dependencies]]
+      name = "mongodb-driver-reactivestreams"
+      sha256 = "a68804af81661c9ed68f9f44f776819c5f54f7d9489f028e59d673de73e4898a"
+      version = "4.2.3"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-buffer"
+      sha256 = "e7679ba4f3b2fbec1cd356380b056254fc4e9c0093ef7b083fbf75a79a6fe333"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-codec"
+      sha256 = "84cf17dea1fe712a455b0694ea11024136c72b160b778690c5d60b61132fc107"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-codec-dns"
+      sha256 = "c7994b3ff24fa1d55f1fd824951633d106f5b8905925e55b3046db5cb4c94bc8"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-codec-http"
+      sha256 = "e0b893c94fa49c1e2820fa99bbc8a66cbf763708d804501cfa1bc2eda364241e"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-codec-http2"
+      sha256 = "e43414944040f448480df9b47d9eadd114ddbae752423d12144596e26857d7fc"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-codec-socks"
+      sha256 = "7301af1518f25df7e95037df326f191e26c698fe211d495f1dbf7499cba76d73"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-common"
+      sha256 = "40287020bef62e40dcc0050f3113e2beeea13d4a8138ee639b63829815f5c7e6"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-handler"
+      sha256 = "c1061395931d5f0897dafc45e10e07bb489105a441ea0038e2b2c544cc86cf13"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-handler-proxy"
+      sha256 = "940ff6500ddffad0cd346921e98ad168d96760fee537019dd178c7ac76c785d8"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-resolver"
+      sha256 = "9849c2488740ac8128bd0a863362612e8e0bcc9c660fce1e95e3ff82fb5c47ef"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-resolver-dns"
+      sha256 = "efeef6eba59f19a8479d5c2e8d67444f3071150df7f2872aa8bef5b067510089"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-resolver-dns-native-macos"
+      sha256 = "a1790f94a15b2829d5a84c1a9453c56fa8a6bda465d3c232e765b24d7dd1ed2a"
+      version = "4.1.65.Final-osx-x86_64"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-transport"
+      sha256 = "12ac5da4e48d8e6c132d376867e9af89aff444e7486571faf53594a2529b98fe"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-transport-native-epoll"
+      sha256 = "6438d194322d5d393b1f6b841bb1643349ccdf635ca0e8b06fa2749551b97481"
+      version = "4.1.65.Final-linux-x86_64"
+
+    [[bom.metadata.dependencies]]
+      name = "netty-transport-native-unix-common"
+      sha256 = "9fd0078e3d11d6974db18238a7e5fb4e18dd656ca36b5fb1895ad6c2ab045a2c"
+      version = "4.1.65.Final"
+
+    [[bom.metadata.dependencies]]
+      name = "reactive-streams"
+      sha256 = "1dee0481072d19c929b623e155e14d2f6085dc011529a0a0dbefc84cf571d865"
+      version = "1.0.3"
+
+    [[bom.metadata.dependencies]]
+      name = "reactor-core"
+      sha256 = "55cba6545c61887539bd42b3b98ec93c4ccf26d954e8bfd24a6c7b8bf24d277b"
+      version = "3.4.6"
+
+    [[bom.metadata.dependencies]]
+      name = "reactor-netty-core"
+      sha256 = "0142cddbbcbf255d0711ea5fdab72492b1cc349d2ebd92865218c1b149317b67"
+      version = "1.0.7"
+
+    [[bom.metadata.dependencies]]
+      name = "reactor-netty-http"
+      sha256 = "45927ab3d7b33fded36a7e19fe7010db5e4eb9e6759efc812d4f8dbb3c33833e"
+      version = "1.0.7"
+
+    [[bom.metadata.dependencies]]
+      name = "slf4j-api"
+      sha256 = "cdba07964d1bb40a0761485c6b1e8c2f8fd9eb1d19c53928ac0d7f9510105c57"
+      version = "1.7.30"
+
+    [[bom.metadata.dependencies]]
+      name = "snakeyaml"
+      sha256 = "35446a1421435d45e4c6ac0de3b5378527d5cc2446c07183e24447730ce1fffa"
+      version = "1.28"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-aop"
+      sha256 = "e6b3a15592a3b5a29131865ff82b3e2bacf7e64f1819924af93eb19b49085af1"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-beans"
+      sha256 = "8c02823ceb0370bcf6e9eeccbc2d429a484b429457faa7e8bc39506eaaf6ace6"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-boot"
+      sha256 = "7c1ca05f6a76670c232ff304a790766d01e2503488f62e4d0f90d858c9f9fdef"
+      version = "2.5.0"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-boot-autoconfigure"
+      sha256 = "291adbe58b6ed20ddb788bfd62fbb4a43af7c55be38d1233714f5954ffe9142a"
+      version = "2.5.0"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-boot-jarmode-layertools"
+      sha256 = "8fa4acfd4e5f0564b7670e8551988d360ea914317a901cdf66bfe9e1bb155212"
+      version = "2.5.0"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-context"
+      sha256 = "6d9bb2dcc297f3eb5c5457cfe2159935ad7d77a2400c8252e4beb235c1168b9f"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-core"
+      sha256 = "cfb42af01d4796e567f0e64be439712551e0909f576ecae61dacf502f6b1a3e8"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-data-commons"
+      sha256 = "d5150a4d323db0b497561aa4cdebeef724b5eda9e32084488457a6218559bc30"
+      version = "2.5.1"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-data-mongodb"
+      sha256 = "53fa2fa9d76a47c65b2cd574104725d6127f256bdd887eb5b251b8ff06a169a6"
+      version = "3.2.1"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-expression"
+      sha256 = "a818630d8e55077f2be7254f9dc03be1b7d01143f7c36f8cdcfc9c7be0b94573"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-jcl"
+      sha256 = "f7422de77287703879f04ad32df4fe8e24eee882654da34cd10121aaca1ef6aa"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-tx"
+      sha256 = "482fd4db5a74f6204c2ac5cdd6bfde54ffba897412083a184696c4f01c8a1bf2"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-web"
+      sha256 = "bba996b82aaec5d896d9cd05e33525acabd263042d47486fbe2609d144e906a0"
+      version = "5.3.7"
+
+    [[bom.metadata.dependencies]]
+      name = "spring-webflux"
+      sha256 = "de16cae39fc62c38cf1d08e083b85d131f0e103ad6f51e48638362a344d2ed85"
+      version = "5.3.7"
+  [bom.buildpack]
+    id = "paketo-buildpacks/spring-boot"
+    version = "4.3.0"
+
+[[bom]]
+  name = "helper"
+  [bom.metadata]
+    layer = "helper"
+    names = ["spring-cloud-bindings"]
+    version = "4.3.0"
+  [bom.buildpack]
+    id = "paketo-buildpacks/spring-boot"
+    version = "4.3.0"
+
+[[bom]]
+  name = "spring-cloud-bindings"
+  [bom.metadata]
+    layer = "spring-cloud-bindings"
+    name = "Spring Cloud Bindings"
+    sha256 = "a52c2592d58555b6d70a3b0128be70852c83a0c58b70a7b23c07ebd9631ec47a"
+    stacks = ["io.buildpacks.stacks.bionic", "org.cloudfoundry.stacks.cflinuxfs3"]
+    uri = "https://repo.spring.io/release/org/springframework/cloud/spring-cloud-bindings/1.7.1/spring-cloud-bindings-1.7.1.jar"
+    version = "1.7.1"
+
+    [[bom.metadata.licenses]]
+      type = "Apache-2.0"
+      uri = "https://github.com/spring-cloud/spring-cloud-bindings/blob/main/LICENSE"
+  [bom.buildpack]
+    id = "paketo-buildpacks/spring-boot"
+    version = "4.3.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/ca-certificates"
+  id = "paketo-buildpacks/ca-certificates"
+  version = "2.2.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/bellsoft-liberica"
+  id = "paketo-buildpacks/bellsoft-liberica"
+  version = "8.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/executable-jar"
+  id = "paketo-buildpacks/executable-jar"
+  version = "5.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/dist-zip"
+  id = "paketo-buildpacks/dist-zip"
+  version = "4.0.0"
+
+[[buildpacks]]
+  api = "0.5"
+  homepage = "https://github.com/paketo-buildpacks/spring-boot"
+  id = "paketo-buildpacks/spring-boot"
+  version = "4.3.0"
+
+[[labels]]
+  key = "org.opencontainers.image.title"
+  value = "spring-webflux-mongodb-reactive-app"
+
+[[labels]]
+  key = "org.opencontainers.image.version"
+  value = "0.0.1-SNAPSHOT"
+
+[[labels]]
+  key = "org.springframework.boot.version"
+  value = "2.5.0"
+
+[[processes]]
+  type = "executable-jar"
+  command = "java"
+  args = ["org.springframework.boot.loader.JarLauncher"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"
+
+[[processes]]
+  type = "task"
+  command = "java"
+  args = ["org.springframework.boot.loader.JarLauncher"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"
+
+[[processes]]
+  type = "web"
+  command = "java"
+  args = ["org.springframework.boot.loader.JarLauncher"]
+  direct = true
+  buildpack-id = "paketo-buildpacks/executable-jar"
+
+[[slices]]
+  paths = ["BOOT-INF/lib/"]
+
+[[slices]]
+  paths = ["org/"]
+
+[[slices]]
+  paths = []
+
+[[slices]]
+  paths = ["BOOT-INF/classes/", "BOOT-INF/classpath.idx", "BOOT-INF/layers.idx", "META-INF/"]
