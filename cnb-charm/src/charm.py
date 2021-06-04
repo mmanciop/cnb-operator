@@ -4,24 +4,16 @@
 #
 # Learn more at: https://juju.is/docs/sdk
 
-"""Charm the service.
-
-Refer to the following post for a quick-start guide that will help you
-develop a new k8s charm using the Operator Framework:
-
-    https://discourse.charmhub.io/t/4208
-"""
-
 import logging
 import toml
 
 from enum import Enum
 
-from ops.charm import CharmBase
+from ops.charm import CharmBase, RelationJoinedEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
-from ops.pebble import APIError, ConnectionError
+from ops.pebble import APIError
 
 from urllib.parse import urlparse
 
@@ -50,7 +42,7 @@ class ApplicationType(Enum):
 # * Find out in which scenarios we should rather invoke
 #   /cnb/process/executable-jar or /cnb/process/task
 class CloudNativeBuildpackCharm(CharmBase):
-    """Charm the service."""
+    """Charm applications packages with Cloud Native Buildpacks"""
 
     _stored = StoredState()
 
@@ -63,8 +55,10 @@ class CloudNativeBuildpackCharm(CharmBase):
         self.framework.observe(self.on.config_changed,
                                self._on_config_changed)
 
+        self.framework.observe(self.on["mongodb"].relation_joined,
+                               self._on_mongodb_relation_upserted)
         self.framework.observe(self.on["mongodb"].relation_changed,
-                               self._on_mongodb_relation_changed)
+                               self._on_mongodb_relation_upserted)
         self.framework.observe(self.on["mongodb"].relation_broken,
                                self._on_mongodb_relation_broken)
 
@@ -100,20 +94,7 @@ class CloudNativeBuildpackCharm(CharmBase):
             "Configuration changed"
         )
 
-    def _on_mongodb_relation_changed(self, event):
-        # Nothing to do until pebble is ready and we can inspect
-        # the application container
-        if self._stored.application_type is None:
-            logger.debug("Pebble has not yet determined whether "
-                         "the application container has been "
-                         "built with Cloud Native Buildpacks")
-            event.defer()
-            return
-
-        self.unit.status = MaintenanceStatus(
-            "Processing changes in the 'mongodb' relation"
-        )
-
+    def _on_mongodb_relation_upserted(self, event):
         data = event.relation.data[event.unit]
         replica_set_uri = data.get("replica_set_uri")
         replica_set_name = data.get("replica_set_name")
@@ -136,36 +117,35 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         logger.debug("Updated MongoDB URI configuration: %s", replica_set_uri)
 
-        try:
-            self._update_cnb_lyfecycle_layer_and_restart_application(
-                "MongoDB relation created"
-            )
-        except ConnectionError:  # Pebble not ready yet
-            logger.debug("Deferring update of MongoDB configurations, Pebble is "
-                         "not ready yet in the 'application' container")
-            event.defer()
+        # Nothing else to do until pebble is ready and we can inspect
+        # the application container
+        if self._stored.application_type is None:
+            logger.debug("Pebble has not yet determined whether "
+                         "the application container has been "
+                         "built with Cloud Native Buildpacks")
             return
 
+        message = "MongoDB relation changed"
+        if isinstance(event, RelationJoinedEvent):
+            message = "MongoDB relation created"
+
+        self._update_cnb_lyfecycle_layer_and_restart_application(
+            message
+        )
+
     def _on_mongodb_relation_broken(self, event):
+        self._stored.mongodb_uri = str()
+        logger.debug("Removed MongoDB URI configuration")
+
         # Nothing to do until pebble is ready and we can inspect the application container
         if self._stored.application_type is None:
             logger.debug("Pebble has not yet determined whether the application "
                          "container has been built with Cloud Native Buildpacks")
-            event.defer()
             return
 
-        self._stored.mongodb_uri = str()
-        logger.debug("Removed MongoDB URI configuration")
-
-        try:
-            self._update_cnb_lyfecycle_layer_and_restart_application(
-                "MongoDB relation removed"
-            )
-        except ConnectionError:  # Pebble not ready yet
-            logger.debug("Deferring update of MongoDB configurations, "
-                         "Pebble is not ready yet in the 'application' container")
-            event.defer()
-            return
+        self._update_cnb_lyfecycle_layer_and_restart_application(
+            "MongoDB relation removed"
+        )
 
     def _determine_application_type(self):
         """ Check if it is a Buildpack application (by looking for the
