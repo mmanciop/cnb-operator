@@ -5,9 +5,11 @@
 # Learn more at: https://juju.is/docs/sdk
 
 import logging
+import json
 import toml
 
 from enum import Enum
+from jinja2 import Environment
 
 from ops.charm import CharmBase, RelationJoinedEvent
 from ops.framework import StoredState
@@ -65,8 +67,6 @@ class CloudNativeBuildpackCharm(CharmBase):
         # is it Spring Boot, something else on JVM, or Node.js, etc.
         self._stored.set_default(application_type=None)
         # connection info for mongodb
-        self._stored.set_default(mongodb_uri=str())
-        # connection info for mongodb
         self._stored.set_default(current_environment={})
 
     def _on_application_pebble_ready(self, event):
@@ -99,23 +99,9 @@ class CloudNativeBuildpackCharm(CharmBase):
         replica_set_uri = data.get("replica_set_uri")
         replica_set_name = data.get("replica_set_name")
 
-        missing_relation_data = []
-        if replica_set_uri is None:
-            missing_relation_data.append("replica_set_uri")
-
-        if replica_set_name is None:
-            missing_relation_data.append("replica_set_name")
-
-        if missing_relation_data:
-            self.unit.status = BlockedStatus(
-                "'mongodb' relation data is incomplete,"
-                " the following data are missing: "
-                f"{', '.join(missing_relation_data)}")
-            return
-
-        self._stored.mongodb_uri = replica_set_uri
-
-        logger.debug("Updated MongoDB URI configuration: %s", replica_set_uri)
+        logger.debug("Updated MongoDB URI configuration: "
+                     "replica_set_uri: %s; replica_set_name: %s",
+                     replica_set_uri, replica_set_name)
 
         # Nothing else to do until pebble is ready and we can inspect
         # the application container
@@ -134,10 +120,10 @@ class CloudNativeBuildpackCharm(CharmBase):
         )
 
     def _on_mongodb_relation_broken(self, event):
-        self._stored.mongodb_uri = str()
         logger.debug("Removed MongoDB URI configuration")
 
-        # Nothing to do until pebble is ready and we can inspect the application container
+        # Nothing to do until pebble is ready and we can inspect the
+        # application container
         if self._stored.application_type is None:
             logger.debug("Pebble has not yet determined whether the application "
                          "container has been built with Cloud Native Buildpacks")
@@ -214,23 +200,138 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         application_container = self.unit.get_container("application")
 
+        template_globals = {
+            "relations": {
+                "consumed": {}
+            }
+        }
+
+        # Check required relations
+        # TODO Use JSON schema for this?
+        if self.model.config["consumed_relations"]:
+            consumed_relations = []
+
+            try:
+                consumed_relations = json.loads(self.model.config["consumed_relations"])
+
+                if not type(consumed_relations) == list:
+                    raise Exception("The 'consumed_relations' configuration is expected "
+                                    "to contain a stringified JSON array; "
+                                    f"found a '{type(consumed_relations)}' instead")
+
+                for index, consumed_relation in enumerate(consumed_relations):
+                    if not type(consumed_relation) == dict:
+                        raise Exception(f"The item number {index} of the 'consumed_relations' "
+                                        "configuration is expected to contain a JSON object; "
+                                        f"found a '{type(consumed_relation)}' instead")
+
+                    if not consumed_relation["name"]:
+                        raise Exception("The required field 'name' is missing from the item "
+                                        f"number {index} of the 'consumed_relations' "
+                                        "configuration")
+
+            except Exception:
+                logger.exception("An error occurred while parsing the 'consumed_relations' "
+                                 "configuration")
+                self.unit.status = BlockedStatus("Invalid 'consumed_relations' configuration")
+                return
+
+            for consumed_relation in consumed_relations:
+                relation_name = consumed_relation["name"]
+                relation_required = consumed_relation["required"]
+
+                relations = self.model.relations[relation_name]
+
+                if len(relations) == 0:
+                    if relation_required is True or relation_required == "true":
+                        # TODO What about multiple relations of the same type?
+
+                        self.unit.status = BlockedStatus(
+                            f"The required consumed '{relation_name}' relation is missing")
+                        return
+
+                    # Relation is optional, skip
+                    continue
+
+                # if len(relations) > 1:
+                #     self.unit.status = BlockedStatus(
+                #         "There is more than one instance of the required consumed relation "
+                #         f"'{relation_name}'; only one instance of a relation is currently "
+                #         "supported")
+                #     return
+
+                # relation = relations[0]
+
+                # if relation.name == "mongodb":
+
+                    # Need to read the standalone_uri from the unit data
+                    # TODO Fix this when the mongodb-k8s operator gets updated
+
+                    # logger.error(f"MongoDB data: {relation.data}")
+                    # logger.error(f"MongoDB units: {relation.units}")
+                    # logger.error(f"MongoDB app: {relation.app}")
+
+                    # if "replica_set_uri" not in relation.data:
+                    #     raise Exception("The 'mongodb' relation does not contain the "
+                    #                     "expected 'replica_set_uri' key")
+
+                    # mongodb_uri = relation.data["replica_set_uri"]
+                    # parse_result = urlparse(mongodb_uri)
+
+                    # template_globals["relations"]["consumed"]["mongodb"] = {
+                    #     "hostname": parse_result.hostname,
+                    #     "port": parse_result.port
+                    # }
+
+                    # logger.debug(
+                    #     "Added MongoDB relation data to template globals: "
+                    #     "hostname: %s; port: %s", parse_result.hostname, parse_result.port
+                    # )
+
+        template_environment = Environment()
         new_environment = {}
 
-        if self._stored.mongodb_uri:
-            mongodb_uri = self._stored.mongodb_uri
+        if self.model.config["environment"]:
+            environment_variables = []
 
-            parse_result = urlparse(mongodb_uri)
+            try:
+                environment = json.loads(self.model.config["environment"])
 
-            hostname = parse_result.hostname
-            port = parse_result.port
+                if not type(environment) == list:
+                    raise Exception("The 'environment' configuration is expected "
+                                    "to contain a stringified JSON array; "
+                                    f"found a '{type(environment)}' instead")
 
-            new_environment["SPRING_DATA_MONGODB_HOST"] = hostname
-            new_environment["SPRING_DATA_MONGODB_PORT"] = port
+                for index, environment_variable in enumerate(environment):
+                    if not type(environment_variable) == dict:
+                        raise Exception(f"The item number {index} of the 'environment' "
+                                        "configuration is expected to contain a JSON object; "
+                                        f"found a '{type(environment_variable)}' instead")
 
-            logger.debug(
-                "Adding Spring Data MongoDB Host and Port to the environment: "
-                "hostname: %s; port: %s", hostname, port
-            )
+                    if not environment_variable["name"]:
+                        raise Exception("The required field 'name' is missing from the item "
+                                        f"number {index} of the 'environment_variable' "
+                                        "configuration")
+
+                    if not environment_variable["value"]:
+                        raise Exception("The required field 'value' is missing from the item "
+                                        f"number {index} of the 'environment_variable' "
+                                        "configuration")
+
+                    environment_variables.append(environment_variable)
+            except Exception:
+                logger.exception("An error occurred while parsing the 'environment' "
+                                 "configuration")
+                self.unit.status = BlockedStatus("Invalid 'environment' configuration")
+                return
+
+            for environment_variable in environment_variables:
+                env_name = environment_variable["name"]
+                env_template = environment_variable["value"]
+
+                value = template_environment.from_string(env_template, template_globals).render()
+
+                new_environment[env_name] = value
 
         application_container.add_layer("cnb_lifecycle", {
             "summary": "cnb lifecycle layer",

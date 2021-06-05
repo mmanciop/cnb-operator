@@ -61,25 +61,21 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     def test_application_pebble_ready_spring_boot(self):
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        # Check the initial Pebble plan is empty
         initial_plan = self.harness.get_container_pebble_plan("application")
         self.assertEqual(initial_plan.to_yaml(), "{}\n")
-        # Expected plan after Pebble ready with default config
 
         container = self.harness.model.unit.get_container("application")
-        # Emit the PebbleReadyEvent carrying the httpbin container
+
         self.harness.charm.on.application_pebble_ready.emit(container)
 
-        # Check the service was started
         self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
 
         service = self.harness.model.unit.get_container("application").get_service("application")
         self.assertTrue(service.is_running())
 
-        # Get the plan now we've run PebbleReady
         updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-        # Check we've got the plan we expected
+
         self.assertTrue("environment" not in
                         updated_plan["services"]["application"])
 
@@ -87,56 +83,110 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     def test_application_pebble_ready_spring_boot_with_mongodb(self):
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        # pretend to have a mongodb relation
-        self.harness.charm._stored.mongodb_uri = 'mongo://test_uri:12345/'
+        # Pretend to have a mongodb relation
+        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+        self.harness.update_relation_data(rel_id, "mongodb-k8s/0", {
+            "replica_set_uri": "mongo://test_uri:12345/",
+            "replica_set_name": "foobar"
+        })
 
-        # Check the initial Pebble plan is empty
+        self.harness.update_config({
+            "consumed_relations": '[{"name": "mongodb","required": "true"}]',
+            "environment": '[{"name":"SPRING_DATA_MONGODB_HOST",\
+                              "value":"{{relations.consumed.mongodb.hostname}}"},\
+                             {"name":"SPRING_DATA_MONGODB_PORT",\
+                               "value":"{{relations.consumed.mongodb.port}}"}]',
+            "files": '[{"path":"/my/mongodb/configuration",\
+                        "content":"mongodb://{{relations.consumed.mongodb.hostname}}:\
+                                   {{relations.consumed.mongodb.port}}/my_database"}]'
+        })
+
         initial_plan = self.harness.get_container_pebble_plan("application")
         self.assertEqual(initial_plan.to_yaml(), "{}\n")
-        # Expected plan after Pebble ready with default config
 
         container = self.harness.model.unit.get_container("application")
-        # Emit the PebbleReadyEvent carrying the httpbin container
+
         self.harness.charm.on.application_pebble_ready.emit(container)
 
-        # Check the service was started
         self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
 
         service = self.harness.model.unit.get_container("application").get_service("application")
         self.assertTrue(service.is_running())
 
-        # Get the plan now we've run PebbleReady
         updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-        # Check we've got the plan we expected
+
         self.assertDictEqual({
             "SPRING_DATA_MONGODB_HOST": "test_uri",
-            "SPRING_DATA_MONGODB_PORT": 12345
+            "SPRING_DATA_MONGODB_PORT": "12345"
         }, updated_plan["services"]["application"]["environment"])
+
+    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
+    def test_application_pebble_ready_spring_boot_with_mongodb_missing(self):
+        self.assertIsNone(self.harness.charm._stored.application_type)
+
+        self.harness.update_config({
+            "consumed_relations": '[{"name": "mongodb","required": true}]',
+            "environment": '[{"name":"SPRING_DATA_MONGODB_HOST",\
+                              "value":"{{relations.consumed.mongodb.hostname}}"},\
+                             {"name":"SPRING_DATA_MONGODB_PORT",\
+                               "value":"{{relations.consumed.mongodb.port}}"}]',
+            "files": '[{"path":"/my/mongodb/configuration",\
+                        "content":"mongodb://{{relations.consumed.mongodb.hostname}}:\
+                                   {{relations.consumed.mongodb.port}}/my_database"}]'
+        })
+
+        container = self.harness.model.unit.get_container("application")
+
+        self.harness.charm.on.application_pebble_ready.emit(container)
+
+        self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
+        self.assertEqual(self.harness.model.unit.status,
+                         BlockedStatus("The required consumed 'mongodb' relation is missing"))
+
+    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
+    def test_application_pebble_ready_spring_boot_with_optional_mongodb_missing(self):
+        self.assertIsNone(self.harness.charm._stored.application_type)
+
+        self.harness.update_config({
+            "consumed_relations": '[{"name": "mongodb","required": false}]',
+            "environment": '[{"name":"SPRING_DATA_MONGODB_HOST",\
+                              "value":"{{relations.consumed.mongodb.hostname}}"},\
+                             {"name":"SPRING_DATA_MONGODB_PORT",\
+                               "value":"{{relations.consumed.mongodb.port}}"}]',
+            "files": '[{"path":"/my/mongodb/configuration",\
+                        "content":"mongodb://{{relations.consumed.mongodb.hostname}}:\
+                                   {{relations.consumed.mongodb.port}}/my_database"}]'
+        })
+
+        container = self.harness.model.unit.get_container("application")
+
+        self.harness.charm.on.application_pebble_ready.emit(container)
+
+        self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
+        self.assertEqual(self.harness.model.unit.status,
+                         BlockedStatus("The required consumed 'mongodb' relation is missing"))
 
     @patch.object(Container, "pull", new=mock_pull_java_executable_jar_metadata)
     def test_application_pebble_ready_java_executable_jar(self):
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        # Check the initial Pebble plan is empty
         initial_plan = self.harness.get_container_pebble_plan("application")
         self.assertEqual(initial_plan.to_yaml(), "{}\n")
-        # Expected plan after Pebble ready with default config
 
         container = self.harness.model.unit.get_container("application")
-        # Emit the PebbleReadyEvent carrying the httpbin container
+
         self.harness.charm.on.application_pebble_ready.emit(container)
 
-        # Check the service was started
         self.assertEqual(self.harness.charm._stored.application_type, "JVM")
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
 
         service = self.harness.model.unit.get_container("application").get_service("application")
         self.assertTrue(service.is_running())
 
-        # Get the plan now we've run PebbleReady
         updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-        # Check we've got the plan we expected
+
         self.assertTrue("environment" not in
                         updated_plan["services"]["application"])
 
@@ -144,24 +194,20 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     def test_application_pebble_ready_nodejs_http_server(self):
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        # Check the initial Pebble plan is empty
         initial_plan = self.harness.get_container_pebble_plan("application")
         self.assertEqual(initial_plan.to_yaml(), "{}\n")
-        # Expected plan after Pebble ready with default config
 
         container = self.harness.model.unit.get_container("application")
-        # Emit the PebbleReadyEvent carrying the httpbin container
+
         self.harness.charm.on.application_pebble_ready.emit(container)
 
-        # Check the service was started
         self.assertEqual(self.harness.charm._stored.application_type, "UNKNOWN")
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
 
         service = self.harness.model.unit.get_container("application").get_service("application")
         self.assertTrue(service.is_running())
 
-        # Get the plan now we've run PebbleReady
         updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-        # Check we've got the plan we expected
+
         self.assertTrue("environment" not in
                         updated_plan["services"]["application"])

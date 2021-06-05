@@ -1,0 +1,95 @@
+#  Copyright 2021 Canonical Ltd.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+options:
+
+  consumed_relations:
+    type: string
+    default: '[]'
+    description: |
+      Stringified JSON array that allows you to specify which of the relations
+      supported by this charm are actually needed by your application, and whether
+      they are optional or not. As an example, the fopllowing marks the "mongodb"
+      relation as required:
+
+      ```
+      [
+        {
+          "name": "mongodb",
+          "required": "true"
+        }
+      ]
+      ```
+
+      If you list a relation as required, and the deployed charm does not have
+      such a relation, the charm will enter a "blocked" state and your application
+      will not be started until all required relations are provided.
+
+      This will apply also to applications that are already started: if you update
+      the charm configuration with `juju config` to add new relations as required that
+      are not provided to some deployments of the charm, the applications in these
+      deployed charms will be stopped and their charms will go into "blocked" state.
+
+  environment:
+    type: string
+    default: '[]'
+    description: |
+      Stringified JSON array that allows you to specify how data coming through
+      relations is exposed as environment variables to your application. For example,
+      the following will use Jinja2 to template the value of two environment
+      variables `SPRING_DATA_MONGODB_HOST` and `SPRING_DATA_MONGODB_PORT` based on
+      the "hostname" and "port" properties of the consumed `mongodb` relation:
+
+      ```
+      [
+        {
+          "name": "SPRING_DATA_MONGODB_HOST",
+          "value": "{{relations.consumed.mongodb.hostname}}"
+        },
+        {
+          "name": "SPRING_DATA_MONGODB_PORT",
+          "value": "{{relations.consumed.mongodb.port}}"
+        }
+      ]
+      ```
+
+      IMPORTANT: you cannot use values from relations that are not listed under the
+      `consumed_relations` configuration.
+
+      Refer to README.md#relations for an overview of which relations are supported and
+      what attributes they expose.
+
+  files:
+    type: string
+    default: '[]'
+    description: |
+      Stringified JSON array that allows you to specify how data coming through
+      relations is exposed as files in the container of your application. For example,
+      the following will use Jinja2 to template the content of the `/my/mongodb/configuration`
+      file using the `hostname` and `port` properties of the consumed `mongodb` relation:
+
+      ```
+      [
+        {
+          "path": "/my/mongodb/configuration",
+          "content": "mongodb://{{relations.consumed.mongodb.hostname}}:{{relations.consumed.mongodb.port}}/my_database"
+        }
+      ]
+      ```
+
+      IMPORTANT: you can only use values from relations that are listed under the
+      `consumed_relations` configuration.
+
+      Refer to README.md#relations for an overview of which relations are supported and
+      what attributes they expose.
