@@ -120,7 +120,6 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     def test_application_pebble_ready_spring_boot_with_mongodb(self):
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        # Pretend to have a mongodb relation
         rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
         self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
         self.harness.update_relation_data(rel_id, "mongodb-k8s", {
@@ -227,6 +226,16 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
 
         self.assertTrue("environment" not in
                         updated_plan["services"]["application"])
+
+    # def test_evaluate_template_action(self):
+    #     rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+    #     self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+    #     self.harness.update_relation_data(rel_id, "mongodb-k8s", {
+    #         "replica_set_uri": "mongo://test_uri:12345/",
+    #         "replica_set_name": "foobar"
+    #     })
+
+    #     self.harness.charm.on.
 
 
 def _to_config(fixture: Fixture):

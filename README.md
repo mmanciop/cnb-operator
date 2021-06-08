@@ -85,6 +85,8 @@ So, to access the `replica_set_uri`, you can use the following expression:
 {{relations.consumed.mongodb.app.replica_set_uri}}
 ```
 
+To access the current stastus of the template globals as seen by a particular unit, or try to evaluate a template without actually modifying the configuration of the charm, you can use the `dump-template-globals` and `evaluate-template` actions, respectively.
+
 ### Supported relations
 
 The relations currently supported are:

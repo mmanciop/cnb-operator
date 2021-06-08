@@ -16,9 +16,9 @@ from jsonschema import validate
 
 from jinja2.exceptions import UndefinedError
 
-from ops.charm import CharmBase, ConfigChangedEvent, PebbleReadyEvent, \
-    RelationJoinedEvent, RelationBrokenEvent, \
-    StartEvent, UpgradeCharmEvent
+from ops.charm import CharmBase
+from ops.charm import ActionEvent, ConfigChangedEvent, PebbleReadyEvent, \
+    RelationBrokenEvent, StartEvent, UpgradeCharmEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, \
@@ -139,10 +139,6 @@ def _ensure_charm_state(func):
 #
 # * Look up how to open ports in the pod
 #
-# * Create action to dump template eval context
-#
-# * Create action to test template evaluation
-#
 # * Watchdog the application, if it crashes silently
 #   Pebble won't currently auto-restart it
 #
@@ -172,11 +168,16 @@ class CloudNativeBuildpackCharm(CharmBase):
         # TODO Implement stop
         for relation_name in ["mongodb"]:
             self.framework.observe(self.on[relation_name].relation_joined,
-                                self._on_relation_upserted)
+                                   self._on_relation_upserted)
             self.framework.observe(self.on[relation_name].relation_changed,
-                                self._on_relation_upserted)
+                                   self._on_relation_upserted)
             self.framework.observe(self.on[relation_name].relation_broken,
-                                self._on_relation_broken)
+                                   self._on_relation_broken)
+
+        self.framework.observe(self.on.evaluate_template_action,
+                               self._on_evaluate_template_action)
+        self.framework.observe(self.on.dump_template_globals_action,
+                               self._on_dump_template_globals_action)
 
         self.unit.status = WaitingStatus("Waiting to validate the configuration")
 
@@ -196,6 +197,40 @@ class CloudNativeBuildpackCharm(CharmBase):
         except Exception as e:
             raise InvalidConfigurationException(configuration_name,
                                                 str(e))
+
+    def _on_evaluate_template_action(self, event: ActionEvent):
+        try:
+            template = event.params["template"]
+
+            logger.debug("Action 'template_action', template: %s", template)
+
+            template_globals = self._calculate_template_globals()
+
+            logger.debug("Template globals: %s", template_globals)
+
+            template_environment = Environment()
+
+            rendered_template = template_environment \
+                .from_string(template, template_globals).render()
+
+            event.set_results({
+                "template": template,
+                "rendered-template": rendered_template
+            })
+        except Exception as e:
+            logger.exception("Action 'evaluate-template' failed")
+            event.fail(f"Action 'evaluate-template' failed: {str(e)}")
+
+    def _on_dump_template_globals_action(self, event: ActionEvent):
+        try:
+            template_globals = self._calculate_template_globals()
+
+            event.set_results({
+                "template-globals": template_globals
+            })
+        except Exception as e:
+            logger.exception("Action 'dump-template-globals' failed")
+            event.fail(f"Action 'dump-template-globals' failed: {str(e)}")
 
     def _on_start(self, event: StartEvent):
         self._ensure_application_updated_and_running()
@@ -320,47 +355,9 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         application_container = self.unit.get_container("application")
 
-        relations_data = {}
-        for relation_name, relation_metas in self.model.relations.items():
-            relation_data = {
-                "app": {}
-            }
+        template_globals = self._calculate_template_globals()
 
-            if len(relation_metas) < 1:
-                logger.warning("No remote unit is available, cannot lookup "
-                               "application data for the '%s' relation",
-                               relation_name)
-            else:
-                first_relation_meta = relation_metas[0]
-                other_app = next(
-                    filter(lambda item:
-                           type(item) is Application and item.name != self.app.name,
-                           first_relation_meta.data),
-                    None)
-
-                relation_data["app"] = first_relation_meta.data[other_app] or {}
-
-                other_units_data = {}
-                for relation_meta in relation_metas:
-                    other_unit = next(
-                        filter(lambda item:
-                               type(item) is Unit and item.app.name != self.app.name,
-                               relation_meta.data),
-                        None)
-
-                    other_units_data[other_unit.name] = relation_meta.data[other_unit]
-
-                relation_data["units"] = other_units_data
-
-                relations_data[relation_name] = relation_data
-
-        logger.debug("Template context: %s", relations_data)
-
-        template_globals = {
-            "relations": {
-                "consumed": relations_data
-            }
-        }
+        logger.debug("Template globals: %s", template_globals)
 
         template_environment = Environment()
         new_environment = {}
@@ -454,6 +451,47 @@ class CloudNativeBuildpackCharm(CharmBase):
             logger.debug("Current environment updated to: %s", new_environment)
 
         self.unit.status = ActiveStatus()
+
+    def _calculate_template_globals(self):
+        relations_data = {}
+        for relation_name, relation_metas in self.model.relations.items():
+            relation_data = {
+                "app": {}
+            }
+
+            if len(relation_metas) < 1:
+                logger.warning("No remote unit is available, cannot lookup "
+                               "application data for the '%s' relation",
+                               relation_name)
+            else:
+                first_relation_meta = relation_metas[0]
+                other_app = next(
+                    filter(lambda item:
+                           type(item) is Application and item.name != self.app.name,
+                           first_relation_meta.data),
+                    None)
+
+                relation_data["app"] = first_relation_meta.data[other_app] or {}
+
+                other_units_data = {}
+                for relation_meta in relation_metas:
+                    other_unit = next(
+                        filter(lambda item:
+                               type(item) is Unit and item.app.name != self.app.name,
+                               relation_meta.data),
+                        None)
+
+                    other_units_data[other_unit.name] = relation_meta.data[other_unit]
+
+                relation_data["units"] = other_units_data
+
+                relations_data[relation_name] = relation_data
+
+        return {
+            "relations": {
+                "consumed": relations_data
+            }
+        }
 
 
 class CannotPushFileToApplicationContainerException(Exception):
