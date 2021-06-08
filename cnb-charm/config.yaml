@@ -27,12 +27,8 @@ options:
       ```
       [
         {
-          "name": "SPRING_DATA_MONGODB_HOST",
-          "value": "{{relations.consumed.mongodb.hostname}}"
-        },
-        {
-          "name": "SPRING_DATA_MONGODB_PORT",
-          "value": "{{relations.consumed.mongodb.port}}"
+          "name": "SPRING_DATA_MONGODB_URI",
+          "value": "{{relations.consumed.mongodb.app.replica_set_uri}}"
         }
       ]
       ```
@@ -53,7 +49,7 @@ options:
       [
         {
           "path": "/my/mongodb/configuration",
-          "content": "mongodb://{{relations.consumed.mongodb.hostname}}:{{relations.consumed.mongodb.port}}/my_database"
+          "content": "mongodb://{{relations.consumed.mongodb.app.replica_set_uri}}"
         }
       ]
       ```

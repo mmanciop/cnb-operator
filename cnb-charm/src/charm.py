@@ -166,7 +166,7 @@ class CloudNativeBuildpackCharm(CharmBase):
         self.framework.observe(self.on.upgrade_charm,
                                self._on_upgrade_charm)
 
-        for relation_name in ["mongodb"]:
+        for relation_name in self.meta.requires:
             self.framework.observe(self.on[relation_name].relation_joined,
                                    self._on_relation_upserted)
             self.framework.observe(self.on[relation_name].relation_changed,

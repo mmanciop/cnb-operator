@@ -30,7 +30,7 @@
 				"type": "string",
 				"default": "",
 				"examples": [
-					"mongodb://{{relations.consumed.mongodb.hostname}}:{{relations.consumed.mongodb.port}}/my_database"
+					"mongodb://{{relations.consumed.mongodb.app.replica_set_uri}}"
 				],
 				"pattern": "^.*$"
 			}

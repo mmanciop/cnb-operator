@@ -20,7 +20,7 @@
 				"type": "string",
 				"default": "",
 				"examples": [
-					"SPRING_DATA_MONGODB_HOST"
+					"SPRING_DATA_MONGODB_URI"
 				],
 				"pattern": "^.+$"
 			},
@@ -30,7 +30,7 @@
 				"type": "string",
 				"default": "",
 				"examples": [
-					"{{relations.consumed.mongodb.hostname}}"
+					"{{relations.consumed.mongodb.app.replica_set_uri}}"
 				],
 				"pattern": "^.*$"
 			}

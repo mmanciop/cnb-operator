@@ -62,5 +62,4 @@ $ juju debug-log
 ### Add support for a new relation
 
 1. List the relation `name` and `interface` under `requires` in [metadata.yaml](./cnb-charm/metadata.yaml)
-2. Register the relation name in the `__init__` of [charm.py](./cnb-charm/src/charm.py)
-3. Update the [Supported relations](./README.md#supported-relations) section of `README.md`
+2. Update the [Supported relations](./README.md#supported-relations) section of `README.md`
