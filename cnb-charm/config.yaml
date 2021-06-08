@@ -20,9 +20,9 @@ options:
     description: |
       Stringified JSON array that allows you to specify how data coming through
       relations is exposed as environment variables to your application. For example,
-      the following will use Jinja2 to template the value of two environment
-      variables `SPRING_DATA_MONGODB_HOST` and `SPRING_DATA_MONGODB_PORT` based on
-      the "hostname" and "port" properties of the consumed `mongodb` relation:
+      the following will use Jinja2 to template the value of the environment
+      variable `SPRING_DATA_MONGODB_URI` based on the "hostname" and "port"
+      properties of the consumed `mongodb` relation:
 
       ```
       [
