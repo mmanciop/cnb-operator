@@ -26,8 +26,6 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, \
 from ops.model import Application, Unit
 from ops.pebble import APIError
 
-# from urllib.parse import urlparse
-
 logger = logging.getLogger(__name__)
 
 CNB_METADATA_PATH = "/layers/config/metadata.toml"
@@ -142,6 +140,9 @@ def _ensure_charm_state(func):
 # * Watchdog the application, if it crashes silently
 #   Pebble won't currently auto-restart it
 #
+# * Implement stop event to send soft term signal
+#   via Pebble
+#
 class CloudNativeBuildpackCharm(CharmBase):
     """Charm applications packages with Cloud Native Buildpacks"""
 
@@ -165,7 +166,6 @@ class CloudNativeBuildpackCharm(CharmBase):
         self.framework.observe(self.on.upgrade_charm,
                                self._on_upgrade_charm)
 
-        # TODO Implement stop
         for relation_name in ["mongodb"]:
             self.framework.observe(self.on[relation_name].relation_joined,
                                    self._on_relation_upserted)
@@ -460,9 +460,9 @@ class CloudNativeBuildpackCharm(CharmBase):
             }
 
             if len(relation_metas) < 1:
-                logger.warning("No remote unit is available, cannot lookup "
-                               "application data for the '%s' relation",
-                               relation_name)
+                logger.debug("No remote unit is available, cannot lookup "
+                             "application data for the '%s' relation",
+                             relation_name)
             else:
                 first_relation_meta = relation_metas[0]
                 other_app = next(
