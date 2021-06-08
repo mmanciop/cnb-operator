@@ -4,7 +4,7 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import json
 
@@ -227,15 +227,50 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
         self.assertTrue("environment" not in
                         updated_plan["services"]["application"])
 
-    # def test_evaluate_template_action(self):
-    #     rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
-    #     self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
-    #     self.harness.update_relation_data(rel_id, "mongodb-k8s", {
-    #         "replica_set_uri": "mongo://test_uri:12345/",
-    #         "replica_set_name": "foobar"
-    #     })
+    def test_evaluate_template_action_success(self):
+        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+        self.harness.update_relation_data(rel_id, "mongodb-k8s", {
+            "replica_set_uri": "mongo://test_uri:12345/",
+            "replica_set_name": "foobar"
+        })
 
-    #     self.harness.charm.on.
+        action_event = Mock(
+            params={"template": "{{relations.consumed.mongodb.app.replica_set_uri}}"}
+        )
+
+        self.harness.charm._on_evaluate_template_action(action_event)
+
+        self.assertTrue(action_event.set_results.called)
+
+    def test_evaluate_template_action_malformed_template(self):
+        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+        self.harness.update_relation_data(rel_id, "mongodb-k8s", {
+            "replica_set_uri": "mongo://test_uri:12345/",
+            "replica_set_name": "foobar"
+        })
+
+        action_event = Mock(params={"template": "{{ "})
+        self.harness.charm._on_evaluate_template_action(action_event)
+
+        self.assertEqual(action_event.fail.call_args,
+                         [("Action 'evaluate-template' failed: "
+                           "unexpected 'end of template'",)])
+
+    def test_evaluate_dump_template_globals_success(self):
+        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+        self.harness.update_relation_data(rel_id, "mongodb-k8s", {
+            "replica_set_uri": "mongo://test_uri:12345/",
+            "replica_set_name": "foobar"
+        })
+
+        action_event = Mock()
+
+        self.harness.charm._on_dump_template_globals_action(action_event)
+
+        self.assertTrue(action_event.set_results.called)
 
 
 def _to_config(fixture: Fixture):
