@@ -23,8 +23,11 @@ evaluate-template:
         Jinja2 template that models the value of an environment variables
         or a file that the operator could create for you in the application
         container.
+  required: [template]
+  additionalProperties: false
 
 dump-template-globals:
   description: |
     Action to have a dump of the template globals used by Jinja2 template
     to render values of an environment variables or a files.
+  additionalProperties: false
