@@ -19,18 +19,37 @@ operator behaviour without full deployment. Just `run_tests`:
 ./run_tests
 ```
 
+## Deploy test app
+
+Ensure that `microk8s` has the registry enabled:
+
+```sh
+$ microk8s enable registry
+```
+Build a Spring Boot test app and push it to the `microk8s` registry:
+
+```sh
+$ ( cd test/apps/java/spring-data-mongodb-reactive/; ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=localhost:32000/test-app )
+$ docker push localhost:32000/test-app
+```
+
+## Build the charm
+
+```sh
+$ (cd cnb-charm; charmcraft pack)
+```
+
 ## Deploy charm
 
-```
-juju deploy ./cnb-charm/cnb.charm --resource application-image=<image_name>
+```sh
+$ juju deploy ./cnb-charm/cnb.charm --resource application-image=localhost:32000/test-app
 ```
 
 ## Update charm
 
 From the project root:
 
-```
-(cd cnb-charm; charmcraft pack)
-juju refresh cnb --model test-app --path ./cnb-charm/cnb.charm
-juju debug-log
+```sh
+$ juju refresh cnb --path ./cnb-charm/cnb.charm
+$ juju debug-log
 ```

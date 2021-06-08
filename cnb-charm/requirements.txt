@@ -1,3 +1,4 @@
 ops >= 1.2.0
 toml >= 0.10.2
 jinja2
+jsonschema >= 3.2.0

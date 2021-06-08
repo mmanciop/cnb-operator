@@ -1,0 +1,14 @@
+{
+    "environment": [
+        {
+            "name": "SPRING_DATA_MONGODB_URI",
+            "value": "{{relations.consumed.mongodb.app.replica_set_uri}}"
+        }
+    ],
+    "files": [
+        {
+            "path": "/my/mongodb/configuration",
+            "content": "{{relations.consumed.mongodb.app.replica_set_uri}}"
+        }
+    ]
+}

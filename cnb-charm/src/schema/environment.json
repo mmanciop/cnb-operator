@@ -1,0 +1,40 @@
+{
+	"definitions": {},
+	"$schema": "http://json-schema.org/draft-07/schema#", 
+	"$id": "http://charmhub.io/canonical/cnb-operator/schema/charm-configuration/environment/v1", 
+	"title": "Environment", 
+	"type": "array",
+	"default": [],
+	"items":{
+		"$id": "#root/environment_variables", 
+		"title": "Environment Variable", 
+		"type": "object",
+		"required": [
+			"name",
+			"value"
+		],
+		"properties": {
+			"name": {
+				"$id": "#root/environment_variables/name", 
+				"title": "Name", 
+				"type": "string",
+				"default": "",
+				"examples": [
+					"SPRING_DATA_MONGODB_HOST"
+				],
+				"pattern": "^.+$"
+			},
+			"value": {
+				"$id": "#root/environment_variables/value", 
+				"title": "Value", 
+				"type": "string",
+				"default": "",
+				"examples": [
+					"{{relations.consumed.mongodb.hostname}}"
+				],
+				"pattern": "^.*$"
+			}
+		}
+	}
+
+}
