@@ -10,6 +10,33 @@ $ juju deploy cnb-operator --resource application-image=<image>
 
 ## Configurations
 
+* `environment`: Stringified JSON array that allows you to specify how data coming through relations is exposed as environment variables to your application.
+  For example, the following will use Jinja2 to template the value of two environment variables `SPRING_DATA_MONGODB_HOST` and `SPRING_DATA_MONGODB_PORT` based on the `hostname` and `port` properties of the consumed `mongodb` relation:
+
+  ```json
+  [
+    {
+      "name": "SPRING_DATA_MONGODB_URI",
+      "value": "{{relations.consumed.mongodb.app.replicat_set_uri}}"
+    }
+  ]
+  ```
+
+  Refer to the [Relations](#relations) section for an overview of which relations are supported and what attributes they expose.
+
+* `files`: Stringified JSON array that allows you to specify how data coming through relations is exposed as files in the container of your application.
+  For example, the following will use Jinja2 to template the content of the `/my/mongodb/configuration` file using the `hostname` and `port` properties of the consumed `mongodb` relation:
+
+  ```json
+  [
+    {
+      "path": "/my/mongodb/replica_set_uri",
+      "content": "{{relations.consumed.mongodb.app.replicat_set_uri}}"
+    }
+  ]
+  ```
+
+  Refer to the [Relations](#relations) section for an overview of which relations are supported and what attributes they expose.
 
 ## How does it work?
 
