@@ -62,17 +62,17 @@ The following globals will be accessible in the templates for environment variab
 {
   "relations": {
     "consumed": {
-        <relation_name>: {
-          "app": {
-            <other_application_properties>
-          },
-          "units": {
-            <unit-name>: {
-              <other_unit_properties>
-            }
+      <relation_name>: {
+        "app": {
+          <other_application_properties>
+        },
+        "units": {
+          <unit-name>: {
+            <other_unit_properties>
           }
         }
-      }, ...
+      }
+    }, ...
   }
 }
 ```
@@ -112,6 +112,12 @@ So, to access the `replica_set_uri`, you can use the following expression:
 {{relations.consumed.mongodb.app.replica_set_uri}}
 ```
 
+Instead, to send traces to a Jaeger endpoint, this `environment` configuration sets the necessary `JAEGER_AGENT_HOST` and `JAEGER_AGENT_PORT` environment variables:
+
+```sh
+$ juju config <app_name> environment='[{"name":"JAEGER_AGENT_HOST","value":"{{relations.consumed.jaeger.units[\"jaeger/0\"][\"agent-address\"]}}"},{"name":"JAEGER_AGENT_PORT","value":"{{relations.consumed.jaeger.units[\"jaeger/0\"].port}}"}]'
+```
+
 To access the current stastus of the template globals as seen by a particular unit, or try to evaluate a template without actually modifying the configuration of the charm, you can use the `dump-template-globals` and `evaluate-template` actions, respectively.
 
 ### Supported relations
@@ -121,3 +127,4 @@ The relations currently supported are:
 | Relation interface | Charm |
 | --- | --- |
 | `mongodb` | [MongoDB K8S](https://charmhub.io/mongodb-k8s) |
+| `jaeger` | Pending |
