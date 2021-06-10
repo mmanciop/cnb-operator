@@ -15,10 +15,9 @@ containers:
     resource: application-image
 
 requires:
-  mongodb:
+  database:
     interface: mongodb
-  jaeger:
-    interface: distributed-tracing
+    optional: false
 
 resources:
   application-image:

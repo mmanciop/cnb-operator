@@ -3,34 +3,33 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import json
 import unittest
 from unittest.mock import Mock, patch
 
-import json
-
 from charm import CloudNativeBuildpackCharm
-from ops.model import ActiveStatus, BlockedStatus, Container, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, Container, MaintenanceStatus
 from ops.pebble import APIError
 from ops.testing import Harness
 
 
-def mock_pull_api_error(self, path):
+def mock_pull_api_error(self, *args, **kwargs):
     raise APIError({}, -1, "NOT MOCKED", "NOOOOOOO")
 
 
-def mock_pull_spring_boot_metadata(self, path):
+def mock_pull_spring_boot_metadata(self, *args, **kwargs):
     return Fixture("metadata/spring_boot.toml")
 
 
-def mock_pull_java_executable_jar_metadata(self, path):
+def mock_pull_java_executable_jar_metadata(self, *args, **kwargs):
     return Fixture("metadata/java_jar.toml")
 
 
-def mock_pull_nodejs_http_server_metadata(self, path):
+def mock_pull_nodejs_http_server_metadata(self, *args, **kwargs):
     return Fixture("metadata/nodejs_http_server.toml")
 
 
-def mock_pull_file_not_found(self, path):
+def mock_pull_file_not_found(self, *args, **kwargs):
     raise APIError("no", "nope", "NOPE", "No such file or directory")
 
 
@@ -43,48 +42,42 @@ class Fixture:
         return self.content
 
 
+def _fixture_as_str(fixture_path: str):
+    return json.loads(
+        Fixture(
+            "metadata.yaml/spring_data_mongodb_config.json"
+        ).read()
+    )
+
+
 class CloudNativeBuildpackCharmTests(unittest.TestCase):
 
-    def setUp(self):
-        self.harness = Harness(CloudNativeBuildpackCharm)
+    def setUp(self, meta=None):
+        self.harness = Harness(
+            charm_cls=CloudNativeBuildpackCharm,
+            meta=meta
+        )
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
         self.maxDiff = None
 
     @patch.object(Container, "pull", new=mock_pull_api_error)
-    def test_charm_waiting_with_config_without_pebble(self):
-        self.harness.update_config({})
-
-        self.assertEqual(self.harness.model.unit.status, WaitingStatus(
+    def test_charm_waiting_for_pebble(self):
+        self.assertEqual(self.harness.model.unit.status, MaintenanceStatus(
             "Waiting for Pebble to initialize in the application container"
         ))
 
-    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
-    def test_charm_blocked_with_invalid_config(self):
-        self.harness.update_config({
-            "environment": "[{yolo"
-        })
-
-        self.assertEqual(self.harness.model.unit.status, BlockedStatus(
-            "Invalid 'environment' configuration"
-        ))
-
-        # Charm stays blocked even if we fire Pebble ready, but the app
-        # type will be detected
-        container = self.harness.model.unit.get_container("application")
-        self.harness.charm.on.application_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
-
-        self.assertEqual(self.harness.model.unit.status, BlockedStatus(
-            "Invalid 'environment' configuration"
-        ))
-
     @patch.object(Container, "pull", new=mock_pull_file_not_found)
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
     def test_application_pebble_ready_no_metadata_file(self):
-        self.assertIsNone(self.harness.charm._stored.application_type)
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
 
-        self.harness.update_config({})
+        self.assertIsNone(self.harness.charm._stored.application_type)
 
         container = self.harness.model.unit.get_container("application")
         self.harness.charm.on.application_pebble_ready.emit(container)
@@ -95,44 +88,27 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
         ))
 
     @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
-    def test_application_pebble_ready_spring_boot(self):
-        self.assertIsNone(self.harness.charm._stored.application_type)
-
-        self.harness.update_config({})
-
-        container = self.harness.model.unit.get_container("application")
-
-        self.harness.charm.on.application_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
-        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
-
-        service = self.harness.model.unit.get_container("application").get_service("application")
-        self.assertTrue(service.is_running())
-
-        updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-
-        self.assertTrue("environment" not in
-                        updated_plan["services"]["application"])
-
-    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
     @patch.object(Container, "push", new=lambda self, path, content: None)
-    def test_application_pebble_ready_spring_boot_with_mongodb(self):
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
+    def test_application_pebble_ready_with_all_relations_missing(self):
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
+
+        # TODO Wire environment and files
+
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        rel_id = self.harness.add_relation("database", "mongodb-k8s")
         self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
         self.harness.update_relation_data(rel_id, "mongodb-k8s", {
             "replica_set_uri": "mongo://test_uri:12345/",
             "replica_set_name": "foobar"
         })
 
-        self.harness.update_config(
-            _to_config(
-                Fixture("configuration/spring_data_mongodb_required.json")
-            )
-        )
-
         container = self.harness.model.unit.get_container("application")
 
         self.harness.charm.on.application_pebble_ready.emit(container)
@@ -145,90 +121,73 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
 
         updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
 
-        self.assertDictEqual({
-            "SPRING_DATA_MONGODB_URI": "mongo://test_uri:12345/"
-        }, updated_plan["services"]["application"]["environment"])
+        self.assertTrue("environment" in
+                        updated_plan["services"]["application"])
+
+        # TODO Test environment and files
 
     @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
     @patch.object(Container, "push", new=lambda self, path, content: None)
-    def test_application_pebble_ready_spring_boot_with_missing_mongodb_used(self):
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_and_jaeger_config.json"
+                  ))
+    def test_application_pebble_ready_some_relations_missing(self):
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_and_jaeger_manifest.yaml"
+        ).read())
+
+        # TODO Wire environment and files
+
         self.assertIsNone(self.harness.charm._stored.application_type)
 
-        self.harness.update_config(
-            _to_config(
-                Fixture("configuration/spring_data_mongodb_required.json")
-            )
-        )
+        rel_id = self.harness.add_relation("database", "mongodb-k8s")
+        self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
+        self.harness.update_relation_data(rel_id, "mongodb-k8s", {
+            "replica_set_uri": "mongo://test_uri:12345/",
+            "replica_set_name": "foobar"
+        })
 
         container = self.harness.model.unit.get_container("application")
 
         self.harness.charm.on.application_pebble_ready.emit(container)
 
         self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
-        self.assertEqual(self.harness.model.unit.status,
-                         BlockedStatus("Invalid 'environment' configuration"))
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(
+            "Required consumed relations are missing: distributed-tracing"
+        ))
 
     @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
-    def test_application_pebble_ready_spring_boot_with_mongodb_not_used(self):
-        self.assertIsNone(self.harness.charm._stored.application_type)
-
-        self.harness.update_config(
-            _to_config(
-                Fixture("configuration/empty_env_and_files.json")
-            )
-        )
-
-        container = self.harness.model.unit.get_container("application")
-
-        self.harness.charm.on.application_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm._stored.application_type, "SPRING_BOOT")
-        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
-
-    @patch.object(Container, "pull", new=mock_pull_java_executable_jar_metadata)
-    def test_application_pebble_ready_java_executable_jar(self):
-        self.assertIsNone(self.harness.charm._stored.application_type)
-
-        self.harness.update_config({})
+    @patch.object(Container, "push", new=lambda self, path, content: None)
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
+    def test_missing_relation(self):
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
 
         container = self.harness.model.unit.get_container("application")
 
         self.harness.charm.on.application_pebble_ready.emit(container)
 
-        self.assertEqual(self.harness.charm._stored.application_type, "JVM")
-        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
+        self.assertEqual(self.harness.model.unit.status,
+                         BlockedStatus("Required consumed relations are "
+                                       "missing: database"))
 
-        service = self.harness.model.unit.get_container("application").get_service("application")
-        self.assertTrue(service.is_running())
-
-        updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-
-        self.assertTrue("environment" not in
-                        updated_plan["services"]["application"])
-
-    @patch.object(Container, "pull", new=mock_pull_nodejs_http_server_metadata)
-    def test_application_pebble_ready_nodejs_http_server(self):
-        self.assertIsNone(self.harness.charm._stored.application_type)
-
-        self.harness.update_config({})
-
-        container = self.harness.model.unit.get_container("application")
-
-        self.harness.charm.on.application_pebble_ready.emit(container)
-
-        self.assertEqual(self.harness.charm._stored.application_type, "UNKNOWN")
-        self.assertEqual(self.harness.model.unit.status, ActiveStatus())
-
-        service = self.harness.model.unit.get_container("application").get_service("application")
-        self.assertTrue(service.is_running())
-
-        updated_plan = self.harness.get_container_pebble_plan("application").to_dict()
-
-        self.assertTrue("environment" not in
-                        updated_plan["services"]["application"])
-
+    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
+    @patch.object(Container, "push", new=lambda self, path, content: None)
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
     def test_evaluate_template_action_success(self):
-        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
+
+        rel_id = self.harness.add_relation("database", "mongodb-k8s")
         self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
         self.harness.update_relation_data(rel_id, "mongodb-k8s", {
             "replica_set_uri": "mongo://test_uri:12345/",
@@ -236,15 +195,27 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
         })
 
         action_event = Mock(
-            params={"template": "{{relations.consumed.mongodb.app.replica_set_uri}}"}
+            params={
+                "template": "{{relations.consumes.database.app.replica_set_uri}}"
+            }
         )
 
         self.harness.charm._on_evaluate_template_action(action_event)
 
         self.assertTrue(action_event.set_results.called)
 
+    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
+    @patch.object(Container, "push", new=lambda self, path, content: None)
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
     def test_evaluate_template_action_malformed_template(self):
-        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
+
+        rel_id = self.harness.add_relation("database", "mongodb-k8s")
         self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
         self.harness.update_relation_data(rel_id, "mongodb-k8s", {
             "replica_set_uri": "mongo://test_uri:12345/",
@@ -258,8 +229,18 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
                          [("Action 'evaluate-template' failed: "
                            "unexpected 'end of template'",)])
 
+    @patch.object(Container, "pull", new=mock_pull_spring_boot_metadata)
+    @patch.object(Container, "push", new=lambda self, path, content: None)
+    @patch.object(CloudNativeBuildpackCharm, "_get_configs",
+                  new=lambda x: _fixture_as_str(
+                      "metadata.yaml/spring_data_mongodb_config.json"
+                  ))
     def test_evaluate_dump_template_globals_success(self):
-        rel_id = self.harness.add_relation("mongodb", "mongodb-k8s")
+        self.setUp(meta=Fixture(
+            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+        ).read())
+
+        rel_id = self.harness.add_relation("database", "mongodb-k8s")
         self.harness.add_relation_unit(rel_id, "mongodb-k8s/0")
         self.harness.update_relation_data(rel_id, "mongodb-k8s", {
             "replica_set_uri": "mongo://test_uri:12345/",
@@ -271,12 +252,3 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
         self.harness.charm._on_dump_template_globals_action(action_event)
 
         self.assertTrue(action_event.set_results.called)
-
-
-def _to_config(fixture: Fixture):
-    parsed_fixture = json.load(fixture)
-
-    return {
-        "environment": json.dumps(parsed_fixture["environment"]),
-        "files": json.dumps(parsed_fixture["files"])
-    }

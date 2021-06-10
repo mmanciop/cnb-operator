@@ -7,12 +7,10 @@
 import functools
 import logging
 import json
-import pathlib
 import toml
 
 from enum import Enum
 from jinja2 import Environment
-from jsonschema import validate
 
 from jinja2.exceptions import UndefinedError
 
@@ -21,8 +19,7 @@ from ops.charm import ActionEvent, ConfigChangedEvent, PebbleReadyEvent, \
     RelationBrokenEvent, StartEvent, UpgradeCharmEvent
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, \
-    WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from ops.model import Application, Unit
 from ops.pebble import APIError
 
@@ -43,13 +40,6 @@ class ApplicationType(Enum):
     # DOT_NET = 40
 
 
-def _load_json_schema(schema_filename):
-    script_dir = pathlib.Path(__file__).parent.absolute()
-
-    with open(f"{script_dir}/schema/{schema_filename}") as f:
-        return json.load(f)
-
-
 def _catch_block_status(func):
 
     @functools.wraps(func)
@@ -68,9 +58,8 @@ def _ensure_charm_state(func):
         ensures that the charm:
 
         1. Is not in a Blocked status
-        2. Its configuration has been parsed and is valid
-        3. All required consumed relations are available
-        4. Pebble has been initialized and it has identified
+        2. All required consumed relations are available
+        3. Pebble has been initialized and it has identified
            the OCI image as built with CNBs
     """
 
@@ -85,24 +74,26 @@ def _ensure_charm_state(func):
                 # TODO Quirk of the test harness?
                 event.defer()
 
-        # We need to have a parsed, validated configuration
-        # before anything meaningful can happen
-        if self._stored.parsed_configuration is None:
-            if type(self.unit.status) == BlockedStatus:
-                logger.debug("Delaying event, charm in blocked state")
+        # Check required relations are all there
+        missing_relations = []
+        for relation_name in self.meta.requires:
+            if relation_name in self.model.relations and self.model.relations[relation_name]:
+                # TODO Check interface?
+                continue
             else:
-                logger.debug("Delaying event, configuration not parsed yet")
-                self.unit.status = WaitingStatus(
-                    "Waiting to parse the configuration"
-                )
+                missing_relations.append(relation_name)
+
+        if missing_relations:
+            self.unit.status = BlockedStatus(
+                "Required consumed relations are missing: "
+                f"{', '.join(missing_relations)}"
+            )
+
+            logger.debug("Required consumed relations are missing: %s ; "
+                         "deferring the event",
+                         ", ".join(missing_relations))
 
             _defer_event(event)
-
-            return
-
-        # We is the charm is blocked, do NOTHING
-        if type(self.unit.status) == BlockedStatus:
-            logger.debug("Suppressing event handler, charm is blocked")
             return
 
         # We also need to know that the application is a CNB one
@@ -115,13 +106,14 @@ def _ensure_charm_state(func):
             self._determine_application_type()
 
             if self._stored.application_type is None:
-                self.unit.status = WaitingStatus(
-                    "Waiting for Pebble to initialize in the application "
-                    "container"
+                self.unit.status = MaintenanceStatus(
+                    "Waiting for Pebble to initialize in the "
+                    "application container"
                 )
 
                 logger.debug(
-                    "Delaying event, application type not determined yet"
+                    "Delaying event, application type not "
+                    "determined yet"
                 )
 
                 _defer_event(event)
@@ -147,10 +139,6 @@ class CloudNativeBuildpackCharm(CharmBase):
     """Charm applications packages with Cloud Native Buildpacks"""
 
     _stored = StoredState()
-
-    _environment_schema = _load_json_schema("environment.json")
-
-    _files_schema = _load_json_schema("files.json")
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -179,24 +167,14 @@ class CloudNativeBuildpackCharm(CharmBase):
         self.framework.observe(self.on.dump_template_globals_action,
                                self._on_dump_template_globals_action)
 
-        self.unit.status = WaitingStatus("Waiting to validate the configuration")
+        self.unit.status = MaintenanceStatus(
+            "Waiting for Pebble to initialize in the application container"
+        )
 
-        # parsed and validated configuration
-        self._stored.set_default(parsed_configuration=None)
-        # is it Spring Boot, something else on JVM, or Node.js, etc.
         self._stored.set_default(application_type=None)
-        # connection info for mongodb
         self._stored.set_default(current_environment={})
-
-    def _parse_configuration(self, configuration_name, configuration_schema):
-        try:
-            if configuration_name in self.config:
-                parsed_json = json.loads(self.config[configuration_name])
-                validate(parsed_json, configuration_schema)
-                return parsed_json
-        except Exception as e:
-            raise InvalidConfigurationException(configuration_name,
-                                                str(e))
+        # Key: path in application container; Value: hash of file content
+        self._stored.set_default(rendered_files={})
 
     def _on_evaluate_template_action(self, event: ActionEvent):
         try:
@@ -237,9 +215,7 @@ class CloudNativeBuildpackCharm(CharmBase):
 
     @_catch_block_status
     def _on_upgrade_charm(self, event: UpgradeCharmEvent = None):
-        # The logic to identify CNB images could have changed, as well
-        # as the schema for parsing configs
-        self._stored.parsed_configuration = None
+        # The logic to identify CNB images could have changed
         self._stored.application_type = None
 
         self._on_config_changed(None)
@@ -247,31 +223,6 @@ class CloudNativeBuildpackCharm(CharmBase):
 
     @_catch_block_status
     def _on_config_changed(self, event: ConfigChangedEvent = None):
-        self.unit.status = MaintenanceStatus("Validating the configuration")
-
-        try:
-            environment_json = self._parse_configuration(
-                "environment",
-                self._environment_schema
-            )
-
-            files_json = self._parse_configuration(
-                "files",
-                self._files_schema
-            )
-
-            self._stored.parsed_configuration = {
-                "environment": environment_json,
-                "files": files_json
-            }
-        except InvalidConfigurationException as e:
-            logger.error(f"Invalid '{e.configuration_option}' configuration: "
-                         f"{e.message}")
-            raise BlockedStatusException(f"Invalid '{e.configuration_option}' "
-                                         "configuration")
-
-        self.unit.status = WaitingStatus("Waiting to start the application")
-
         self._ensure_application_updated_and_running()
 
     @_catch_block_status
@@ -362,10 +313,10 @@ class CloudNativeBuildpackCharm(CharmBase):
         template_environment = Environment()
         new_environment = {}
 
-        if "environment" in self._stored.parsed_configuration:
-            environment = self._stored.parsed_configuration["environment"]
+        config = self._get_configs()
 
-            for environment_variable in environment:
+        if "environment" in config:
+            for environment_variable in config["environment"]:
                 env_name = environment_variable["name"]
                 env_template = environment_variable["value"]
 
@@ -378,10 +329,10 @@ class CloudNativeBuildpackCharm(CharmBase):
                     logger.exception(f"Cannot render environment variable '{env_name}'")
                     raise BlockedStatusException("Invalid 'environment' configuration")
 
-        if "files" in self._stored.parsed_configuration:
-            files = self._stored.parsed_configuration["files"]
+        if "files" in config:
+            previous_files = self._stored.rendered_files
 
-            for file in files:
+            for file in config["files"]:
                 path = file["path"]
                 content_template = file["content"]
 
@@ -392,6 +343,13 @@ class CloudNativeBuildpackCharm(CharmBase):
                 except UndefinedError:
                     logger.exception(f"Cannot render file '{path}'")
                     raise BlockedStatusException("Invalid 'files' configuration")
+
+                content_hash = hash(content)
+                if path in previous_files:
+                    if content_hash is previous_files[path]:
+                        continue
+
+                self._stored.rendered_files[path] = content_hash
 
                 try:
                     application_container.push(path, content)
@@ -420,6 +378,7 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         log_start = True
         if application_container.get_service("application").is_running():
+            # TODO Check that files did not change
             if new_environment == self._stored.current_environment:
                 logger.debug(
                     "No changes in configuration detected, the application "
@@ -427,8 +386,8 @@ class CloudNativeBuildpackCharm(CharmBase):
                 )
             else:
                 logger.info(
-                    "Restarting the application to apply environment "
-                    "configuration changes"
+                    "Restarting the application to apply configuration "
+                    "changes"
                 )
                 log_start = False
 
@@ -441,16 +400,20 @@ class CloudNativeBuildpackCharm(CharmBase):
                 self.unit.status = MaintenanceStatus("Starting the application")
                 logger.info("Starting the application")
 
-            logger.debug("Application environment based on configurations and relations: %s",
+            logger.debug("Application environment: %s",
                          new_environment)
 
             application_container.start("application")
             logger.debug("Application started")
 
             self._stored.current_environment = new_environment
-            logger.debug("Current environment updated to: %s", new_environment)
+            logger.debug("Application environment updated to: %s", new_environment)
 
         self.unit.status = ActiveStatus()
+
+    def _get_configs(self):
+        with open("config.json") as config_json:
+            return json.load(config_json)
 
     def _calculate_template_globals(self):
         relations_data = {}
@@ -460,7 +423,7 @@ class CloudNativeBuildpackCharm(CharmBase):
             }
 
             if len(relation_metas) < 1:
-                logger.debug("No remote unit is available, cannot lookup "
+                logger.error("No remote unit is available, cannot lookup "
                              "application data for the '%s' relation",
                              relation_name)
             else:
@@ -489,7 +452,7 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         return {
             "relations": {
-                "consumed": relations_data
+                "consumes": relations_data
             }
         }
 
@@ -503,12 +466,12 @@ class CannotPushFileToApplicationContainerException(Exception):
         self.message = message
 
 
-class InvalidConfigurationException(Exception):
+class CannotDeleteFileFromApplicationContainerException(Exception):
 
-    def __init__(self, configuration_option, message):
+    def __init__(self, path, message):
         super().__init__(self)
 
-        self.configuration_option = configuration_option
+        self.path = path
         self.message = message
 
 

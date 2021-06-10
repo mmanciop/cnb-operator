@@ -1,0 +1,21 @@
+---
+relations:
+  consumes:
+  - name: database
+    interface: mongodb
+  - name: distributed-tracing
+    interface: jaeger
+
+environment:
+- name: SPRING_DATA_MONGODB_URI
+  value: '{{relations.consumes.database.app.replica_set_uri}}'
+- name: JAEGER_AGENT_HOST
+  value: '{{relations.consumes.distributed-tracing.app.agent_host}}'
+- name: JAEGER_AGENT_PORT
+  value: '{{relations.consumes.distributed-tracing.app.port}}'
+
+files:
+- path: /my/mongodb/configuration
+  content: |
+    server.port=8080
+    spring.data.mongodb.uri={{relations.consumes.database.app.replica_set_uri}}
