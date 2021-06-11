@@ -1,0 +1,270 @@
+#!/bin/env python3
+
+#
+# Appcraft: Generate tailored bundles for your 1st party apps
+#           packaged as Cloud Native Buildpacks
+#
+
+from jinja2 import Environment
+from jsonschema import validate
+from yaml.loader import SafeLoader
+from distutils import dir_util, file_util
+from pathlib import Path
+
+import argparse
+import json
+import logging
+import os
+import pathlib
+import subprocess
+import tempfile
+import yaml
+
+parser = argparse.ArgumentParser(description="Appcraft: Charm all them apps!")
+
+parser.add_argument("manifest",
+                    type=argparse.FileType("rb"),
+                    help="path to the appcharm manifest, or `-` when piping from stdin")
+
+parser.add_argument("-p", "--project-dir",
+                    type=str,
+                    help="Directory where the source code of the CNB charm is found")
+
+args = parser.parse_args()
+
+if "project_dir" in args:
+    repository_directory = args.project_dir
+else:
+    repository_directory = os.getcwd()
+
+repository_directory = Path(repository_directory).absolute()
+
+print(f"Loading manifest ... ", end='')
+
+manifest_content = yaml.load(args.manifest.read(), Loader=SafeLoader)
+
+print("Done")
+
+MANIFEST_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "$ref": "#/definitions/Manifest",
+    "definitions": {
+        "Manifest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "default": ""
+                },
+                "summary": {
+                    "type": "string",
+                    "default": ""
+                },
+                "requires": {
+                    "$ref": "#/definitions/RequiredRelations"
+                },
+                "environment": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Environment"
+                    }
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/File"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "requires"
+            ],
+            "title": "Manifest"
+        },
+        "Environment": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "template"
+            ],
+            "title": "Environment"
+        },
+        "File": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path",
+                "template"
+            ],
+            "title": "File"
+        },
+        "RequiredRelations": {
+            "type": "object",
+            "additionalProperties": False,
+            "patternProperties": {
+                "^[A-Za-z_][A-Za-z0-9_]*$": {
+                    "$ref": "#/definitions/Relation"
+                }
+            },
+            "title": "RequiredRelations"
+        },
+        "Relation": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "interface": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interface"
+            ],
+            "title": "Relation"
+        }
+    }
+}
+
+print(f"Validating manifest ... ", end='')
+try:
+    validate(manifest_content, MANIFEST_SCHEMA)
+except Exception:
+    logging.exception("Invalid manifest")
+    os._exit(1)
+
+application_name = manifest_content["name"]
+
+print("Done")
+
+print(f"Preparing charm metadata ... ", end='')
+
+required_relations = []
+if "requires" in manifest_content:
+    for consumed_relation_name in manifest_content["requires"]:
+        relation = {
+            "name": consumed_relation_name,
+            "interface": manifest_content["requires"][consumed_relation_name]["interface"]
+        }
+
+        required_relations.append(relation)
+
+summary = str()
+if "summary" in manifest_content:
+    summary = manifest_content["summary"]
+
+description = str()
+if "description" in manifest_content:
+    description = manifest_content["description"]
+
+template_globals = {
+    "name": application_name,
+    "summary": summary,
+    "description": description,
+    "requires": required_relations
+}
+# TODO Do description
+
+metadata_template = """# Copyright 2021 Ubuntu
+# See LICENSE file for licensing details.
+name: {{name}}
+description: |
+  {{description}}
+summary: |
+  {{summary}}
+containers:
+  application:
+    resource: application-image
+
+requires:
+{%- for relation in requires %}
+  {{ relation.name }}:
+    interface: {{ relation.interface }}
+{%- endfor %}
+
+resources:
+  application-image:
+    type: oci-image
+    description: |
+      OCI image containing the application to run.
+      Must have been built with Cloud Native Buildpacks (https://buildpacks.io)
+
+"""
+
+template_environment = Environment()
+metadata = template_environment.from_string(metadata_template, template_globals).render()
+
+with tempfile.TemporaryDirectory(prefix=f"appcraft-{application_name}-charm-") as temporary_directory:
+    dir_util.copy_tree(f"{repository_directory}/src", f"{temporary_directory}/src")
+
+    for file in ["LICENSE", "NOTICE", "requirements.txt", "actions.yaml", "config.yaml"]:
+        if os.path.exists(f"{repository_directory}/{file}"):
+            file_util.copy_file(f"{repository_directory}/{file}", f"{temporary_directory}/{file}")
+
+    with open(f"{temporary_directory}/metadata.yaml", "w") as metadata_yaml:
+        metadata_yaml.write(metadata)
+
+    with open(f"{temporary_directory}/src/config.json", "w") as config_json:
+        config = {
+            "environment": {},
+            "files": {}
+        }
+
+        if "environment" in manifest_content:
+            config["environment"] = manifest_content["environment"]
+
+        if "files" in manifest_content:
+            config["files"] = manifest_content["files"]
+
+        config_json.write(json.dumps(config))
+
+    print("Done")
+
+    expected_charm_file_name = f"{application_name}.charm"
+    expected_charm_file_path = f"{repository_directory}/{expected_charm_file_name}"
+
+    print(f"Packing {expected_charm_file_name} ... ", end='', flush=True)
+
+    # YOLO https://github.com/canonical/charmcraft/issues/380
+    cmd = ["charmcraft", "pack", "-p", temporary_directory]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    o, e = proc.communicate()
+
+    if proc.returncode > 0:
+        print(f"Invoking '{' '.join(cmd)}' failed with status code: {proc.returncode}; the stderr output was the following:")
+        print(e)
+        os._exit(3)
+
+    if not os.path.isfile(expected_charm_file_path):
+        print(f"Cannot find the expected charm file {expected_charm_file_path}") 
+        os._exit(4)
+
+    print("Done")
+
+print(f"""To deploy {expected_charm_file_name}, run:
+
+  $ juju deploy {expected_charm_file_path} --resource application-image=<application_image>
+    """)
+
+os._exit(0)

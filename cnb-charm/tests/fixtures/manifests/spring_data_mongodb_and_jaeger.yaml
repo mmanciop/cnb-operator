@@ -1,21 +1,22 @@
 ---
-relations:
-  consumes:
-  - name: database
+name: cnb
+
+requires:
+  database:
     interface: mongodb
-  - name: distributed-tracing
-    interface: jaeger
+  distributed-tracing:
+    interface: jaeger-ingestion
 
 environment:
 - name: SPRING_DATA_MONGODB_URI
-  value: '{{relations.consumes.database.app.replica_set_uri}}'
+  template: '{{relations.consumes.database.app.replica_set_uri}}'
 - name: JAEGER_AGENT_HOST
-  value: '{{relations.consumes.distributed-tracing.app.agent_host}}'
+  template: '{{relations.consumes["distributed-tracing"].app.agent_host}}'
 - name: JAEGER_AGENT_PORT
-  value: '{{relations.consumes.distributed-tracing.app.port}}'
+  template: '{{relations.consumes["distributed-tracing"].app.port}}'
 
 files:
 - path: /my/mongodb/configuration
-  content: |
+  template: |
     server.port=8080
     spring.data.mongodb.uri={{relations.consumes.database.app.replica_set_uri}}

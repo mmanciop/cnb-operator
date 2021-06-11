@@ -1,15 +1,16 @@
 ---
-relations:
-  consumes:
-  - name: database
+name: cnb
+
+requires:
+  database:
     interface: mongodb
 
 environment:
 - name: SPRING_DATA_MONGODB_URI
-  value: '{{relations.consumes.database.app.replica_set_uri}}'
+  template: '{{relations.consumes.database.app.replica_set_uri}}'
 
 files:
 - path: /my/mongodb/configuration
-  content: |
+  template: |
     server.port=8080
     spring.data.mongodb.uri={{relations.consumes.database.app.replica_set_uri}}

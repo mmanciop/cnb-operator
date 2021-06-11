@@ -14,13 +14,14 @@ from jinja2 import Environment
 
 from jinja2.exceptions import UndefinedError
 
+from os import path
+
 from ops.charm import CharmBase
 from ops.charm import ActionEvent, ConfigChangedEvent, PebbleReadyEvent, \
     RelationBrokenEvent, StartEvent, UpgradeCharmEvent
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
-from ops.model import Application, Unit
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,8 @@ def _catch_block_status(func):
             return func(self, *args, **kwargs)
         except BlockedStatusException as e:
             self.unit.status = BlockedStatus(e.message)
+        except WaitingStatusException as e:
+            self.unit.status = WaitingStatus(e.message)
 
     return _decorator_func
 
@@ -75,13 +78,10 @@ def _ensure_charm_state(func):
                 event.defer()
 
         # Check required relations are all there
-        missing_relations = []
-        for relation_name in self.meta.requires:
-            if relation_name in self.model.relations and self.model.relations[relation_name]:
-                # TODO Check interface?
-                continue
-            else:
-                missing_relations.append(relation_name)
+        relations = self.model.relations
+        missing_relations = [relation_name for relation_name
+                             in relations
+                             if not relations or not relations[relation_name]]
 
         if missing_relations:
             self.unit.status = BlockedStatus(
@@ -153,6 +153,8 @@ class CloudNativeBuildpackCharm(CharmBase):
                                self._on_start)
         self.framework.observe(self.on.upgrade_charm,
                                self._on_upgrade_charm)
+        self.framework.observe(self.on.update_status,
+                               self._on_update_status)
 
         for relation_name in self.meta.requires:
             self.framework.observe(self.on[relation_name].relation_joined,
@@ -183,8 +185,6 @@ class CloudNativeBuildpackCharm(CharmBase):
             logger.debug("Action 'template_action', template: %s", template)
 
             template_globals = self._calculate_template_globals()
-
-            logger.debug("Template globals: %s", template_globals)
 
             template_environment = Environment()
 
@@ -222,6 +222,10 @@ class CloudNativeBuildpackCharm(CharmBase):
         self._on_application_pebble_ready(None)
 
     @_catch_block_status
+    def _on_update_status(self, event=None):
+        self._ensure_application_updated_and_running()
+
+    @_catch_block_status
     def _on_config_changed(self, event: ConfigChangedEvent = None):
         self._ensure_application_updated_and_running()
 
@@ -247,6 +251,10 @@ class CloudNativeBuildpackCharm(CharmBase):
         """
 
         previous_type = self._stored.application_type
+
+        if previous_type is not None:
+            logger.debug("Checking if the application type changed from %s",
+                         previous_type)
 
         application_container = self.unit.get_container("application")
         # TODO Support lookup of the ${LAYERS_DIR} value when we can
@@ -308,8 +316,6 @@ class CloudNativeBuildpackCharm(CharmBase):
 
         template_globals = self._calculate_template_globals()
 
-        logger.debug("Template globals: %s", template_globals)
-
         template_environment = Environment()
         new_environment = {}
 
@@ -318,7 +324,7 @@ class CloudNativeBuildpackCharm(CharmBase):
         if "environment" in config:
             for environment_variable in config["environment"]:
                 env_name = environment_variable["name"]
-                env_template = environment_variable["value"]
+                env_template = environment_variable["template"]
 
                 try:
                     value = template_environment.from_string(env_template,
@@ -327,14 +333,14 @@ class CloudNativeBuildpackCharm(CharmBase):
                     new_environment[env_name] = value
                 except UndefinedError:
                     logger.exception(f"Cannot render environment variable '{env_name}'")
-                    raise BlockedStatusException("Invalid 'environment' configuration")
+                    raise BlockedStatusException("Cannot render environment variables")
 
         if "files" in config:
             previous_files = self._stored.rendered_files
 
             for file in config["files"]:
                 path = file["path"]
-                content_template = file["content"]
+                content_template = file["template"]
 
                 content = None
                 try:
@@ -342,7 +348,7 @@ class CloudNativeBuildpackCharm(CharmBase):
                                                                template_globals).render()
                 except UndefinedError:
                     logger.exception(f"Cannot render file '{path}'")
-                    raise BlockedStatusException("Invalid 'files' configuration")
+                    raise BlockedStatusException("Cannot render files")
 
                 content_hash = hash(content)
                 if path in previous_files:
@@ -412,43 +418,37 @@ class CloudNativeBuildpackCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _get_configs(self):
-        with open("config.json") as config_json:
+        with open(f"{path.dirname(path.realpath(__file__))}/config.json") as config_json:
             return json.load(config_json)
 
     def _calculate_template_globals(self):
         relations_data = {}
-        for relation_name, relation_metas in self.model.relations.items():
+        for relation_name, relations in self.model.relations.items():
             relation_data = {
                 "app": {}
             }
 
-            if len(relation_metas) < 1:
-                logger.error("No remote unit is available, cannot lookup "
-                             "application data for the '%s' relation",
-                             relation_name)
+            relations_data[relation_name] = relation_data
+
+            if len(relations) < 1:
+                raise WaitingStatusException(
+                    f"No remote unit is available for the {relation_name}"
+                    " relation, cannot lookup application data")
             else:
-                first_relation_meta = relation_metas[0]
-                other_app = next(
-                    filter(lambda item:
-                           type(item) is Application and item.name != self.app.name,
-                           first_relation_meta.data),
-                    None)
+                first_relation = relations[0]
 
-                relation_data["app"] = first_relation_meta.data[other_app] or {}
+                relation_data["app"] = first_relation.data[first_relation.app] or {}
 
-                other_units_data = {}
-                for relation_meta in relation_metas:
-                    other_unit = next(
-                        filter(lambda item:
-                               type(item) is Unit and item.app.name != self.app.name,
-                               relation_meta.data),
-                        None)
+                other_units = []
+                for relation in relations:
+                    for unit in relation.units:
+                        if unit is not self.unit:
+                            other_units.append({
+                                field: relation.data[unit].get(field) for field in
+                                relation.data[unit].keys()
+                            })
 
-                    other_units_data[other_unit.name] = relation_meta.data[other_unit]
-
-                relation_data["units"] = other_units_data
-
-                relations_data[relation_name] = relation_data
+                relation_data["units"] = other_units
 
         return {
             "relations": {
@@ -476,6 +476,14 @@ class CannotDeleteFileFromApplicationContainerException(Exception):
 
 
 class BlockedStatusException(Exception):
+
+    def __init__(self, message):
+        super().__init__(self)
+
+        self.message = message
+
+
+class WaitingStatusException(Exception):
 
     def __init__(self, message):
         super().__init__(self)
