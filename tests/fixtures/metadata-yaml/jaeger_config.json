@@ -1,0 +1,3 @@
+{
+    "environment": [{"name": "JAEGER_AGENT_HOST", "template": "{{relations.consumes.jaeger.units[0]['agent-address']}}"}, {"name": "JAEGER_AGENT_PORT", "template": "{{relations.consumes.jaeger.units[0]['port']}}"}]
+}

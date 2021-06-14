@@ -60,7 +60,7 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "pull", new=mock_pull_api_error)
     def test_charm_waiting_for_pebble(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         self.assertEqual(self.harness.model.unit.status, MaintenanceStatus(
@@ -70,11 +70,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "pull", new=mock_pull_file_not_found)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_application_pebble_ready_no_metadata_file(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         self.assertIsNone(self.harness.charm._stored.application_type)
@@ -91,11 +91,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_application_pebble_ready_with_all_relations_missing(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         # TODO Wire environment and files
@@ -130,11 +130,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_and_jaeger_config.json"
+                      "metadata-yaml/spring_data_mongodb_and_jaeger_config.json"
                   ))
     def test_application_pebble_ready_some_relations_missing(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_and_jaeger_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_and_jaeger_manifest.yaml"
         ).read())
 
         # TODO Wire environment and files
@@ -161,11 +161,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_missing_relation(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         container = self.harness.model.unit.get_container("application")
@@ -180,11 +180,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/jaeger_config.json"
+                      "metadata-yaml/jaeger_config.json"
                   ))
     def test_rendered_templates(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/jaeger_manifest.yaml"
+            "metadata-yaml/jaeger_manifest.yaml"
         ).read())
 
         self.assertIsNone(self.harness.charm._stored.application_type)
@@ -217,11 +217,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_evaluate_template_action_success(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         rel_id = self.harness.add_relation("database", "mongodb-k8s")
@@ -245,11 +245,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_evaluate_template_action_malformed_template(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         rel_id = self.harness.add_relation("database", "mongodb-k8s")
@@ -270,11 +270,11 @@ class CloudNativeBuildpackCharmTests(unittest.TestCase):
     @patch.object(Container, "push", new=lambda self, path, content: None)
     @patch.object(CloudNativeBuildpackCharm, "_get_configs",
                   new=lambda x: _fixture_as_str(
-                      "metadata.yaml/spring_data_mongodb_config.json"
+                      "metadata-yaml/spring_data_mongodb_config.json"
                   ))
     def test_evaluate_dump_template_globals_success(self):
         self.init_harness(meta=Fixture(
-            "metadata.yaml/spring_data_mongodb_manifest.yaml"
+            "metadata-yaml/spring_data_mongodb_manifest.yaml"
         ).read())
 
         rel_id = self.harness.add_relation("database", "mongodb-k8s")

@@ -1,0 +1,4 @@
+{
+    "environment": [{"name": "SPRING_DATA_MONGODB_URI", "template": "{{relations.consumes.database.app.replica_set_uri}}"}],
+    "files": [{"path": "/my/mongodb/configuration", "template": "server.port=8080\nspring.data.mongodb.uri={{relations.consumes.database.app.replica_set_uri}}\n"}]
+}

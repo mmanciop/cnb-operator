@@ -1,0 +1,4 @@
+{
+    "environment": [{"name": "SPRING_DATA_MONGODB_URI", "value": "{{relations.consumes.database.app.replica_set_uri}}"}, {"name": "JAEGER_AGENT_HOST", "template": "{{relations.consumes.distributed-tracing.app.agent_host}}"}, {"name": "JAEGER_AGENT_PORT", "template": "{{relations.consumes.distributed-tracing.app.port}}"}],
+    "files": [{"path": "/my/mongodb/configuration", "template": "server.port=8080\nspring.data.mongodb.uri={{relations.consumes.database.app.replica_set_uri}}\n"}]
+}
