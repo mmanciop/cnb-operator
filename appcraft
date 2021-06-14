@@ -5,6 +5,7 @@
 #           packaged as Cloud Native Buildpacks
 #
 
+import distutils
 from jinja2 import Environment
 from jsonschema import validate
 from yaml.loader import SafeLoader
@@ -13,10 +14,13 @@ from pathlib import Path
 
 import argparse
 import json
+import io
 import logging
 import os
-import pathlib
+import requests
 import subprocess
+import sys
+import tarfile
 import tempfile
 import yaml
 
@@ -33,11 +37,9 @@ parser.add_argument("-p", "--project-dir",
 args = parser.parse_args()
 
 if "project_dir" in args and args.project_dir is not None:
-    repository_directory = args.project_dir
+    repository_directory = Path(args.project_dir).absolute()
 else:
-    repository_directory = os.getcwd()
-
-repository_directory = Path(repository_directory).absolute()
+    repository_directory = None
 
 print(f"Loading manifest ... ", end='')
 
@@ -146,7 +148,7 @@ MANIFEST_SCHEMA = {
     }
 }
 
-print(f"Validating manifest ... ", end='')
+print(f"Validating manifest ... ", end="")
 try:
     validate(manifest_content, MANIFEST_SCHEMA)
 except Exception:
@@ -156,8 +158,6 @@ except Exception:
 application_name = manifest_content["name"]
 
 print("Done")
-
-print(f"Preparing charm metadata ... ", end='')
 
 required_relations = []
 if "requires" in manifest_content:
@@ -216,13 +216,44 @@ metadata = template_environment.from_string(metadata_template, template_globals)
 
 # We need to nest the tmp dir in the repo because of
 # https://github.com/canonical/charmcraft/issues/380
-with tempfile.TemporaryDirectory(prefix=f".appcraft-{application_name}-charm-", dir=repository_directory) as temporary_directory:
+with tempfile.TemporaryDirectory(prefix=f".appcraft-{application_name}-charm-", dir=(repository_directory or os.getcwd())) as temporary_directory:
+    if repository_directory is None:
+        repository = "mmanciop/cnb-operator"
+        repository_url = f"https://github.com/{repository}"
+        api_repository_url = f"https://api.github.com/repos/{repository}"
 
-    dir_util.copy_tree(f"{repository_directory}/src", f"{temporary_directory}/src")
+        print(f"Using the cnb-operator repository: {repository_url}")
 
-    for file in ["LICENSE", "NOTICE", "requirements.txt", "actions.yaml", "config.yaml"]:
-        if os.path.exists(f"{repository_directory}/{file}"):
-            file_util.copy_file(f"{repository_directory}/{file}", f"{temporary_directory}/{file}")
+        latest_release = requests.get(f"{api_repository_url}/releases/latest").json()["name"]
+
+        print(f"Downloading cnb-charm.tgz from release {latest_release} ... ", end="")
+
+        download_url = f"{repository_url}/releases/download/{latest_release}/cnb-charm.tgz"
+        final_url = requests.head(download_url, allow_redirects=True).url
+
+        cnb_charm_download = requests.get(final_url, allow_redirects=True)
+        buffer = io.BytesIO()
+        buffer.write(cnb_charm_download.content)
+        buffer.seek(0)  # Rewind pointer to beginning of buffer
+
+        print("Done")
+
+        print("Unpacking cnb-charm.tgz ... ", end="")
+
+        with tarfile.open(mode="r:gz", fileobj=buffer) as tarball:
+            tarball.extractall(path=temporary_directory)
+
+        print("Done")
+    else:
+        print(f"Using the local cnb-operator repository: {repository_directory}")
+
+        dir_util.copy_tree(f"{repository_directory}/src", f"{temporary_directory}/src")
+
+        for file in ["LICENSE", "NOTICE", "requirements.txt", "actions.yaml", "config.yaml"]:
+            if os.path.exists(f"{repository_directory}/{file}"):
+                file_util.copy_file(f"{repository_directory}/{file}", f"{temporary_directory}/{file}")
+
+    print(f"Preparing charm metadata ... ", end='')
 
     with open(f"{temporary_directory}/metadata.yaml", "w") as metadata_yaml:
         metadata_yaml.write(metadata)
@@ -244,7 +275,7 @@ with tempfile.TemporaryDirectory(prefix=f".appcraft-{application_name}-charm-", 
     print("Done")
 
     expected_charm_file_name = f"{application_name}.charm"
-    expected_charm_file_path = f"{repository_directory}/{expected_charm_file_name}"
+    expected_generated_charm_file_path = f"{os.getcwd()}/{expected_charm_file_name}"
 
     print(f"Packing {expected_charm_file_name} ... ", end='', flush=True)
 
@@ -258,15 +289,15 @@ with tempfile.TemporaryDirectory(prefix=f".appcraft-{application_name}-charm-", 
         print(e)
         os._exit(3)
 
-    if not os.path.isfile(expected_charm_file_path):
-        print(f"Cannot find the expected charm file {expected_charm_file_path}") 
+    if not os.path.isfile(expected_generated_charm_file_path):
+        print(f"Cannot find the expected charm file {expected_generated_charm_file_path}") 
         os._exit(4)
 
     print("Done")
 
-print(f"""To deploy {expected_charm_file_name}, run:
+print(f"""To deploy the {expected_charm_file_name}, run:
 
-  $ juju deploy {expected_charm_file_path} --resource application-image=<application_image>
+  $ juju deploy {expected_generated_charm_file_path} --resource application-image=<application_image>
     """)
 
 os._exit(0)
