@@ -32,7 +32,7 @@ parser.add_argument("-p", "--project-dir",
 
 args = parser.parse_args()
 
-if "project_dir" in args:
+if "project_dir" in args and args.project_dir is not None:
     repository_directory = args.project_dir
 else:
     repository_directory = os.getcwd()
@@ -214,7 +214,10 @@ resources:
 template_environment = Environment()
 metadata = template_environment.from_string(metadata_template, template_globals).render()
 
-with tempfile.TemporaryDirectory(prefix=f"appcraft-{application_name}-charm-") as temporary_directory:
+# We need to nest the tmp dir in the repo because of
+# https://github.com/canonical/charmcraft/issues/380
+with tempfile.TemporaryDirectory(prefix=f".appcraft-{application_name}-charm-", dir=repository_directory) as temporary_directory:
+
     dir_util.copy_tree(f"{repository_directory}/src", f"{temporary_directory}/src")
 
     for file in ["LICENSE", "NOTICE", "requirements.txt", "actions.yaml", "config.yaml"]:
@@ -245,7 +248,6 @@ with tempfile.TemporaryDirectory(prefix=f"appcraft-{application_name}-charm-") a
 
     print(f"Packing {expected_charm_file_name} ... ", end='', flush=True)
 
-    # YOLO https://github.com/canonical/charmcraft/issues/380
     cmd = ["charmcraft", "pack", "-p", temporary_directory]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
