@@ -1,1 +1,10 @@
-.vscode
+venv/
+build/
+*.charm
+
+.coverage
+__pycache__/
+*.py[cod]
+
+metadata.yaml
+src/config.json

@@ -1,0 +1,13 @@
+# Product notes
+
+## Areas that need improvement
+
+* It feels somewhat off to have a manifest taken monstly 1-to-1 into the `metadata.yaml`, with fundamentally the goal of filtering out some aspects not supported in the CNB charm yet (e.g., provided relations), and to add new features to the `metadata.yaml`, specifically `environment` and `files`
+* `appcraft` should be rather a `charmcraft` subcommand like:
+
+  ```sh
+  charmcraft wrap <manifest>
+  ```
+
+* Having `{{...}}` in Jinja 3 to denote accessors in combination with YAML for the manifest wreaks havoc in simple "One env var per relation property" use case, see [README.md](README.md#templates-and-yaml-strings)
+* Hyphens in relation property names lead to Jinja being downright mean, see [README.md](README.md#about-hyphens)

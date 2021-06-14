@@ -1,6 +1,9 @@
-name: Run-Tests
+name: Release
 
-on: [pull_request]
+on: 
+  push:
+    tags:
+    - '*'
 
 jobs:
   run-tests:
@@ -17,8 +20,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # We build the tarball before we import dependencies to avoid
+      # __pycache__ caches
+      - name: Built charm tarball
+        run: tar czvf cnb-charm.tgz -T release/tarball_content 
+
       - name: Install dependencies
         run: python -m pip install -r requirements-dev.txt
 
       - name: Run tests
         run: ./run_tests
+
+      # TODO Integration tests
+
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "cnb-charm.tgz,appcraft"
+          token: ${{ secrets.GITHUB_TOKEN }}
