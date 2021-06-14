@@ -18,15 +18,15 @@ def mock_pull_api_error(self, *args, **kwargs):
 
 
 def mock_pull_spring_boot_metadata(self, *args, **kwargs):
-    return Fixture("metadata/spring_boot.toml")
+    return Fixture("cnb-metadata/spring_boot.toml")
 
 
 def mock_pull_java_executable_jar_metadata(self, *args, **kwargs):
-    return Fixture("metadata/java_jar.toml")
+    return Fixture("cnb-metadata/java_jar.toml")
 
 
 def mock_pull_nodejs_http_server_metadata(self, *args, **kwargs):
-    return Fixture("metadata/nodejs_http_server.toml")
+    return Fixture("cnb-metadata/nodejs_http_server.toml")
 
 
 def mock_pull_file_not_found(self, *args, **kwargs):
