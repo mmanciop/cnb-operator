@@ -1,10 +1,10 @@
 # AppCraft and the Cloud Native Buildpack Meta-Operator
 
-This charm and the accompanying `appcraft` utility allows you to wrap with Juju an existing OCI image built using [Cloud Native Buildpacks](https://buildpacks.io) and enables the administrator to use relation data to render configurations for the application.
+This charm and the accompanying `appcraft` utility allow you to wrap with Juju an existing OCI image built using [Cloud Native Buildpacks](https://buildpacks.io) and to use relation data to render configurations for the wrapped application.
 
 ## Usage
 
-The user experience is centered over `appcraft`, which is a wrapper around `charmcraft` and, optionally, `juju deploy`, to customize the generic Cloud Native Buildpack charm found in the [cnb-charm](./cnb-charm) folder:
+The user experience is centered over `appcraft`, which is a wrapper around `charmcraft` that customizes the generic Cloud Native Buildpack charm provided in this repository:
 
 ```sh
 $ appcraft <manifest_path>
@@ -12,9 +12,7 @@ $ appcraft <manifest_path>
 
 The `manifest_path` is the file path for a [manifest](#manifest) file, or `-` if the manifest is piped into `appcraft` over standard input.
 
-## Lifecycle of the CNB charm
-
-TODO document with a diagram under which circumstances the charm is blocked, and when the application is (re)started
+To get started, clone this repository, or download the latest and greatest `appcraft` from the [Releases](./releases) page.
 
 ## Manifest
 
